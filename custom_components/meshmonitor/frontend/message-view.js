@@ -45,7 +45,10 @@ export const messageConversationCatalog = (
       const node = direct
         ? sources
             .filter((source) => source.protocol === message.protocol)
-            .flatMap((source) => source.nodes || [])
+            .flatMap((source) => [
+              ...(source.nodes || []),
+              ...(source.reticulum?.peers || []),
+            ])
             .find((item) => item.id === recipient)
         : null;
       catalog.set(key, {

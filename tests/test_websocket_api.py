@@ -30,6 +30,7 @@ from custom_components.meshmonitor.vendor_meshmonitor_client import (
     AutomationRun,
     NeighborLink,
     Node,
+    ReticulumDestination,
     ReticulumIdentity,
     ReticulumSnapshot,
     ReticulumStatus,
@@ -462,7 +463,14 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
             }
         ),
         interfaces=(),
-        destinations=(),
+        destinations=(
+            ReticulumDestination.from_dict(
+                {
+                    "destinationHash": "0123456789abcdef0123456789abcdef",
+                    "displayName": "Synthetic LXMF peer",
+                }
+            ),
+        ),
         conversations=(),
         paths=(),
         errors={},
@@ -496,6 +504,12 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
         "mode": "attach",
         "identity_name": "MeshMonitor Synthetic RNS",
         "identity_hash": "20914cb776e9d9e60418354ea6986238",
+        "peers": [
+            {
+                "id": "0123456789abcdef0123456789abcdef",
+                "name": "Synthetic LXMF peer",
+            }
+        ],
     }
 
 

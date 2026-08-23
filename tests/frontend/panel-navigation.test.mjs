@@ -86,6 +86,15 @@ test("registered panel element and browser module stay version-aligned", () => {
   assert.match(panel, new RegExp(`customElements\\.define\\("${element}"`));
 });
 
+test("notification bell uses compact navigation spacing", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /\.notification-bell \{[^}]*flex:0 0 32px;[^}]*width:32px;[^}]*margin:0;[^}]*padding:5px;/);
+});
+
 test("Overview warnings identify and navigate to exact source cards", () => {
   const panel = readFileSync(
     new URL(

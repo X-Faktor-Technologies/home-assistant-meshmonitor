@@ -66,7 +66,7 @@ test("node and message searches expose accessible clear controls", () => {
 
   assert.match(panel, /id="clear-node-search"[^>]*aria-label="Clear node search"/);
   assert.match(panel, /id="clear-message-search"[^>]*aria-label="Clear message search"/);
-  assert.match(panel, /<th class="node-role">Role<\/th>/);
+  assert.match(panel, /sortHeader\("role", "Role", "node-role"\)/);
   assert.doesNotMatch(panel, /Role\/model/);
 });
 
