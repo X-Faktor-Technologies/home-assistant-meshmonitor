@@ -14,6 +14,7 @@ import {
   messageSendNonce,
   messageTimestampMs,
   messagesInConversation,
+  sortMessagesChronologically,
   sendErrorPresentation,
 } from "../../custom_components/meshmonitor/frontend/message-view.js";
 
@@ -97,6 +98,7 @@ test("Reticulum conversations use announced friendly names instead of hashes", (
   const reticulum = {
     ...SOURCE,
     protocol: "reticulum",
+    channels: [],
     nodes: [],
     reticulum: { peers: [{ id: peerHash, name: "Elier's LXMF" }] },
   };
@@ -110,6 +112,47 @@ test("Reticulum conversations use announced friendly names instead of hashes", (
   assert.equal(
     messageConversationCatalog([incoming], [reticulum])[0].name,
     "Elier's LXMF",
+  );
+});
+
+test("outbound and inbound LXMF records share one friendly conversation in time order", () => {
+  const localHash = "20914cb776e9d9e60418354ea6986238";
+  const peerHash = "0123456789abcdef0123456789abcdef";
+  const source = {
+    ...SOURCE,
+    protocol: "reticulum",
+    channels: [],
+    nodes: [],
+    reticulum: { peers: [{ id: peerHash, name: "xPhone" }] },
+  };
+  const outbound = {
+    id: "outbound",
+    protocol: "reticulum",
+    channel: -1,
+    from_id: localHash,
+    to_id: peerHash,
+    direction: "outbound",
+    created_at: 1_777_000_000_000,
+  };
+  const inbound = {
+    id: "inbound",
+    protocol: "reticulum",
+    channel: -1,
+    from_id: peerHash,
+    to_id: localHash,
+    direction: "incoming",
+    created_at: 1_777_000_120_000,
+  };
+
+  const catalog = messageConversationCatalog([outbound, inbound], [source]);
+  const key = `direct:reticulum:${peerHash}`;
+
+  assert.deepEqual(catalog.map((item) => [item.key, item.name]), [[key, "xPhone"]]);
+  assert.equal(messageConversationKey(outbound), key);
+  assert.equal(messageConversationKey(inbound), key);
+  assert.deepEqual(
+    sortMessagesChronologically([inbound, outbound]).map((message) => message.id),
+    ["outbound", "inbound"],
   );
 });
 

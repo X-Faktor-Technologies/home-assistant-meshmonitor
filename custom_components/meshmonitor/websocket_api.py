@@ -29,7 +29,6 @@ from .automation_coordinator import (
 from .const import (
     CONF_ENABLE_FAVORITES,
     CONF_ENABLE_NODE_MANAGEMENT,
-    CONF_ENABLE_NODE_REMOVAL,
     CONF_ENABLE_TRANSMIT,
     CONF_NODE_DEVICE_POLICY,
     CONF_SCAN_INTERVAL,
@@ -316,7 +315,7 @@ def _serialize_entry(
             "node_management_enabled": bool(
                 entry.options.get(CONF_ENABLE_NODE_MANAGEMENT, False)
             ),
-            "node_removal_enabled": bool(entry.options.get(CONF_ENABLE_NODE_REMOVAL, False)),
+            "node_removal_enabled": False,
             "channels": [],
             "nodes": [],
         }
@@ -404,7 +403,7 @@ def _serialize_entry(
         "node_management_enabled": bool(
             entry.options.get(CONF_ENABLE_NODE_MANAGEMENT, False)
         ),
-        "node_removal_enabled": bool(entry.options.get(CONF_ENABLE_NODE_REMOVAL, False)),
+        "node_removal_enabled": False,
         # Channel secrets and raw payloads are deliberately excluded. `has_key`
         # is sufficient for presentation without moving credentials browser-side.
         "channels": [
@@ -488,6 +487,17 @@ def _serialize_message(
             for reception in message.receptions
         ],
     }
+
+
+def _snapshot_local_message_id(snapshot: object | None) -> str | None:
+    """Return the local protocol identity used to classify stored messages."""
+    local_id = getattr(getattr(snapshot, "status", None), "local_node_id", None)
+    if local_id is None:
+        local_id = getattr(getattr(snapshot, "identity", None), "destination_hash", None)
+    if local_id is None:
+        return None
+    normalized = str(local_id).lower().removeprefix("!")
+    return normalized or None
 
 
 def _message_poll_state(runtimes: list[dict[str, Any]]) -> str:
@@ -787,11 +797,9 @@ async def websocket_get_panel_data(
     local_ids_by_entry: dict[str, set[str]] = {}
     for source in entries:
         snapshot = source.runtime_data.coordinator.data
-        local_id = getattr(getattr(snapshot, "status", None), "local_node_id", None)
+        local_id = _snapshot_local_message_id(snapshot)
         if local_id:
-            local_ids_by_entry.setdefault(source.entry_id, set()).add(
-                str(local_id).lower().removeprefix("!")
-            )
+            local_ids_by_entry.setdefault(source.entry_id, set()).add(local_id)
     device_registry = dr.async_get(hass)
     connection.send_result(
         msg["id"],
@@ -1325,64 +1333,10 @@ async def websocket_remove_node(
     if entry is None:
         connection.send_error(msg["id"], "not_found", "MeshMonitor source not found")
         return
-    if not entry.options.get(CONF_ENABLE_NODE_REMOVAL, False):
-        connection.send_error(msg["id"], "node_removal_disabled", "Node removal is disabled")
-        return
-    if entry.data.get(CONF_SOURCE_TYPE) != SOURCE_TYPE_MESHTASTIC:
-        connection.send_error(
-            msg["id"], "not_supported", "Local-only node removal is not available for this protocol"
-        )
-        return
-    snapshot = entry.runtime_data.coordinator.data
-    if isinstance(snapshot, ReticulumSnapshot):
-        connection.send_error(msg["id"], "not_supported", "Node removal requires Meshtastic")
-        return
-    node = next(
-        (item for item in (snapshot.nodes if snapshot else []) if item.id == msg["node_id"]),
-        None,
-    )
-    if node is None:
-        connection.send_error(msg["id"], "not_found", "Node is no longer present")
-        return
-    local_id = str(snapshot.status.local_node_id).lower().removeprefix("!") if snapshot else ""
-    if local_id and local_id == str(node.id).lower().removeprefix("!"):
-        connection.send_error(
-            msg["id"], "local_node", "The monitored source node cannot be removed"
-        )
-        return
-    try:
-        result = await entry.runtime_data.client.delete_meshtastic_node(
-            msg["source_id"], msg["node_id"]
-        )
-    except ValueError as exc:
-        connection.send_error(msg["id"], "invalid_format", str(exc))
-        return
-    except MeshMonitorPermissionError:
-        connection.send_error(
-            msg["id"], "permission_denied", "MeshMonitor token lacks messages:write"
-        )
-        return
-    except MeshMonitorAuthenticationError:
-        connection.send_error(msg["id"], "invalid_auth", "MeshMonitor rejected the token")
-        return
-    except MeshMonitorNotFoundError:
-        connection.send_error(msg["id"], "not_found", "Node is no longer present")
-        return
-    except MeshMonitorConnectionError:
-        connection.send_error(msg["id"], "cannot_connect", "MeshMonitor is unreachable")
-        return
-    except (MeshMonitorResponseError, MeshMonitorServerError):
-        connection.send_error(msg["id"], "remove_failed", "MeshMonitor rejected node removal")
-        return
-    await entry.runtime_data.coordinator.async_request_refresh()
-    connection.send_result(
+    connection.send_error(
         msg["id"],
-        {
-            "node_name": result.node_name,
-            "messages_deleted": result.messages_deleted,
-            "traceroutes_deleted": result.traceroutes_deleted,
-            "telemetry_deleted": result.telemetry_deleted,
-        },
+        "node_removal_unavailable",
+        "Node removal is unavailable with MeshMonitor 4.15.1 API-token authentication",
     )
 
 

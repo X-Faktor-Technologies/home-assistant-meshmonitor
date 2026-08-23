@@ -20,7 +20,6 @@ from .const import (
     CONF_ENABLE_FAVORITES,
     CONF_ENABLE_MESSAGE_POLLING,
     CONF_ENABLE_NODE_MANAGEMENT,
-    CONF_ENABLE_NODE_REMOVAL,
     CONF_ENABLE_SIDEBAR_PANEL,
     CONF_ENABLE_TRANSMIT,
     CONF_EXPOSE_MESSAGE_TEXT,
@@ -75,7 +74,6 @@ _SOURCE_DEFAULTS: dict[str, Any] = {
     CONF_ENABLE_MESSAGE_POLLING: True,
     CONF_EXPOSE_MESSAGE_TEXT: False,
     CONF_ENABLE_FAVORITES: False,
-    CONF_ENABLE_NODE_REMOVAL: False,
     CONF_ENABLE_TRANSMIT: False,
     CONF_ENABLE_NODE_MANAGEMENT: False,
     CONF_AUTOMATED_TX_UTILIZATION_LIMIT: 0,
@@ -555,13 +553,6 @@ class MeshMonitorOptionsFlow(config_entries.OptionsFlow):
                             _SOURCE_DEFAULTS[CONF_AUTOMATED_TX_UTILIZATION_LIMIT],
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
-                    vol.Required(
-                        CONF_ENABLE_NODE_REMOVAL,
-                        default=current.get(
-                            CONF_ENABLE_NODE_REMOVAL,
-                            _SOURCE_DEFAULTS[CONF_ENABLE_NODE_REMOVAL],
-                        ),
-                    ): bool,
                 }
             ),
         )

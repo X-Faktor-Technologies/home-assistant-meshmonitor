@@ -55,8 +55,10 @@ from custom_components.meshmonitor.websocket_api import (
     _serialize_entry,
     _serialize_message,
     _serialize_server_check,
+    _snapshot_local_message_id,
     websocket_get_node_history,
     websocket_get_position_history,
+    websocket_remove_node,
     websocket_request_node_action,
     websocket_send_message,
     websocket_set_favorite,
@@ -155,6 +157,32 @@ def test_outbound_message_uses_local_identity_without_splitting_direct_thread() 
     assert payload["direction"] == "outbound"
     assert payload["from_id"] == "!da539a4c"
     assert payload["to_id"] == "!da5af204"
+
+
+def test_reticulum_identity_classifies_outbound_lxmf_history() -> None:
+    snapshot = SimpleNamespace(
+        status=SimpleNamespace(local_node_id=None),
+        identity=SimpleNamespace(
+            destination_hash="20914cb776e9d9e60418354ea6986238"
+        ),
+    )
+    message = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "rns:source-rns:outbound-1",
+            "fromNodeId": "20914cb776e9d9e60418354ea6986238",
+            "toNodeId": "0123456789abcdef0123456789abcdef",
+            "channel": -1,
+            "text": "Synthetic LXMF send",
+            "timestamp": 1_777_000_000_000,
+            "receptions": [{"sourceId": "source-rns", "sourceType": "reticulum"}],
+        }
+    )
+
+    local_id = _snapshot_local_message_id(snapshot)
+    payload = _serialize_message(message, "entry-rns", {local_id} if local_id else set())
+
+    assert payload["outgoing"] is True
+    assert payload["direction"] == "outbound"
 
 
 @pytest.mark.asyncio
@@ -628,6 +656,38 @@ def _raw_request_node_handler():  # type: ignore[no-untyped-def]
 
 def _raw_ignore_handler():  # type: ignore[no-untyped-def]
     return websocket_set_node_ignored.__wrapped__.__wrapped__
+
+
+def _raw_remove_handler():  # type: ignore[no-untyped-def]
+    return websocket_remove_node.__wrapped__.__wrapped__
+
+
+@pytest.mark.asyncio
+async def test_saved_node_removal_option_cannot_reenable_unavailable_route() -> None:
+    entry = SimpleNamespace(
+        options={"enable_node_removal": True},
+        runtime_data=SimpleNamespace(client=Mock()),
+    )
+    connection = Mock()
+    message = {
+        "id": 87,
+        "entry_id": "entry-1",
+        "source_id": "source-1",
+        "node_id": "!0000002a",
+    }
+
+    with patch(
+        "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+        return_value=entry,
+    ):
+        await _raw_remove_handler()(Mock(), connection, message)
+
+    connection.send_error.assert_called_once_with(
+        87,
+        "node_removal_unavailable",
+        "Node removal is unavailable with MeshMonitor 4.15.1 API-token authentication",
+    )
+    assert not entry.runtime_data.client.mock_calls
 
 
 async def _run_scheduled_sends(hass: Mock) -> None:
