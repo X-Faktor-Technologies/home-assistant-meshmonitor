@@ -1256,6 +1256,13 @@ class MeshMonitorPanel extends HTMLElement {
           button.dataset.positionNode,
           button.dataset.nodeName,
         );
+      const detailButton = event.target.closest?.("[data-map-node-detail]");
+      if (detailButton)
+        this._nodeDetailFromMap(
+          detailButton.dataset.entry,
+          detailButton.dataset.source,
+          detailButton.dataset.mapNodeDetail,
+        );
     });
     if (this._tab === "map")
       window.requestAnimationFrame(() => this._initMap(positioned));
@@ -1768,15 +1775,20 @@ class MeshMonitorPanel extends HTMLElement {
       const link = node.device_id
         ? `<p><a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open Home Assistant device</a></p>`
         : "";
-      const meshmonitorLink = node.meshmonitor_url
-        ? `<p><a href="${escapeHtml(node.meshmonitor_url)}" target="_blank" rel="noopener noreferrer">Open source nodes in MeshMonitor ↗</a></p>`
+      const nodeDetail = this._allNodes().some(
+        (item) =>
+          item.entry_id === node.entry_id &&
+          item.source_id === node.source_id &&
+          item.id === node.id,
+      )
+        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button></p>`
         : "";
       const trail = node.protocol === "meshtastic"
         ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button></p>`
         : "";
       const activity = nodeActivity(node);
       marker.bindPopup(
-        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${meshmonitorLink}`,
+        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${nodeDetail}`,
       );
       if (
         this._mapFocusNode ===
@@ -2189,6 +2201,18 @@ class MeshMonitorPanel extends HTMLElement {
     this._closeNodeDetail(false);
     this._tab = "map";
     this._render();
+  }
+
+  _nodeDetailFromMap(entryId, sourceId, nodeId) {
+    const node = this._allNodes().find(
+      (item) =>
+        item.entry_id === entryId &&
+        item.source_id === sourceId &&
+        item.id === nodeId,
+    );
+    if (!node) return;
+    this._tab = "nodes";
+    this._openNodeDetail(entryId, sourceId, nodeId);
   }
 
   _nodeDetailKeydown(event) {
