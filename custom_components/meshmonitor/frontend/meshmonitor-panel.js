@@ -50,7 +50,7 @@ import {
   messageSendNonce,
   messageTimestampMs,
   sendErrorPresentation,
-} from "./message-view.js?v=20260823-1120";
+} from "./message-view.js?v=20260823-1235";
 import {
   PANEL_TABS,
   adjacentPanelTab,
@@ -285,6 +285,23 @@ class MeshMonitorPanel extends HTMLElement {
     return (this._data?.sources || []).flatMap((source) => source.nodes);
   }
 
+  _allMapNodes() {
+    return (this._data?.sources || []).flatMap((source) => [
+      ...(source.nodes || []),
+      ...(source.protocol === "reticulum"
+        ? (source.reticulum?.peers || []).map((peer) => ({
+            ...peer,
+            entry_id: source.entry_id,
+            source_id: source.source_id,
+            source_name: source.name,
+            protocol: "reticulum",
+            last_heard: peer.last_seen,
+            role: peer.app_name || "LXMF destination",
+          }))
+        : []),
+    ]);
+  }
+
   _applyFavoriteOverrides(data) {
     const nodes = (data?.sources || []).flatMap((source) => source.nodes);
     for (const [favoriteKey, favorite] of this._favoriteOverrides) {
@@ -346,7 +363,7 @@ class MeshMonitorPanel extends HTMLElement {
     const sources = this._data?.sources || [];
     const nodes = this._allNodes();
     const messages = this._data?.messages || [];
-    const positioned = nodes.filter(
+    const positioned = this._allMapNodes().filter(
       (node) => node.latitude != null && node.longitude != null,
     );
     this.shadowRoot.innerHTML = `
@@ -513,6 +530,9 @@ class MeshMonitorPanel extends HTMLElement {
         .automation-more summary { width:max-content; max-width:100%; padding:6px 0; color:var(--primary-color); cursor:pointer; font-size:11px; font-weight:650; }
         .automation-more summary:focus-visible { outline:2px solid var(--primary-color); outline-offset:3px; }
         .map-shell { position:relative; overflow:hidden; border:1px solid var(--divider-color); border-radius:16px; background:var(--card-background-color); box-shadow:var(--ha-card-box-shadow,0 2px 5px #0002); }
+        .map-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 16px 12px; background:color-mix(in srgb,var(--card-background-color) 94%,var(--primary-color)); }
+        .map-head h2 { margin:0; font-size:18px; }
+        .map-head p { margin:3px 0 0; font-size:12px; }
         .map-shell:fullscreen { display:flex; flex-direction:column; width:100vw; height:100vh; border:0; border-radius:0; background:var(--primary-background-color); }
         .map-shell:fullscreen .map-canvas { flex:1; min-height:0; }
         .map-shell:fullscreen .map { height:100%; }
@@ -522,7 +542,9 @@ class MeshMonitorPanel extends HTMLElement {
         .map-control-group.filters select { flex:1; min-width:0; }
         .map-control-label { align-self:center; flex:none; margin-right:2px; color:var(--secondary-text-color); font-size:10px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
         .map-toolbar select,.map-toolbar button { min-height:37px; padding:8px 11px; border:1px solid color-mix(in srgb,var(--divider-color) 82%,white); border-radius:10px; background:var(--secondary-background-color); box-shadow:none; }
-        .map-toolbar button:hover,.map-toolbar select:hover { border-color:color-mix(in srgb,var(--primary-color) 55%,var(--divider-color)); background:color-mix(in srgb,var(--secondary-background-color) 88%,var(--primary-color)); }
+        .map-toolbar button:hover,.map-toolbar button:focus-visible,.map-toolbar select:hover,.map-toolbar select:focus-visible { border-color:color-mix(in srgb,var(--primary-color) 55%,var(--divider-color)); background:color-mix(in srgb,var(--secondary-background-color) 88%,var(--primary-color)); }
+        .map-toolbar button { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+        .map-toolbar ha-icon { --mdc-icon-size:18px; }
         .map-toolbar button.active { border-color:color-mix(in srgb,var(--primary-color) 68%,white); background:color-mix(in srgb,var(--primary-color) 78%,#14212a); }
         .map-toolbar .map-icon-button { min-width:39px; padding-left:10px; padding-right:10px; }
         .map-toolbar input[type="range"] { width:110px; margin:0; padding:0; border:0; accent-color:var(--primary-color); }
@@ -548,14 +570,14 @@ class MeshMonitorPanel extends HTMLElement {
         .map-marker { width:19px; height:19px; border:2px solid #effbff; border-radius:50%; box-shadow:0 0 0 3px #061017cc,0 0 13px currentColor; }
         .map-marker.meshtastic { background:var(--protocol-meshtastic); color:var(--protocol-meshtastic); } .map-marker.meshcore { background:var(--protocol-meshcore); color:var(--protocol-meshcore); } .map-marker.reticulum { background:var(--protocol-reticulum); color:var(--protocol-reticulum); }
         .map-marker.stale { opacity:.72; } .map-marker.old { opacity:.52; filter:grayscale(.55); }
-        .map-cluster { display:flex; align-items:center; justify-content:center; width:36px; height:36px; border:2px solid #dff6ff; border-radius:50%; background:#17699a; color:#fff; font-weight:750; box-shadow:0 0 0 3px #061017cc,0 4px 13px #0009; }
+        .map-cluster { display:flex; align-items:center; justify-content:center; width:38px; height:38px; border:2px solid #dff6ff; border-radius:50%; background:linear-gradient(145deg,#2187bd,#125174); color:#fff; font-weight:800; box-shadow:0 0 0 3px #061017cc,0 4px 15px #000a; }
         .map-state { position:absolute; inset:0; z-index:1; display:grid; place-items:center; padding:32px; text-align:center; }
         .map-state>div { max-width:480px; padding:24px 26px; border:1px solid #ffffff1c; border-radius:14px; background:#0b151de8; box-shadow:0 10px 35px #0008; }
         .map-state-label { color:#78cdf6; font-size:10px; font-weight:750; letter-spacing:.1em; text-transform:uppercase; }
         .map-state.failed .map-state-label { color:var(--error-color,#ef5350); }
         .map-state h2 { margin:7px 0 8px; font-size:21px; }
         .map-state p { margin:0; line-height:1.5; }
-        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; }
+        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; background:color-mix(in srgb,var(--card-background-color) 96%,var(--primary-color)); }
         .map-legend { display:flex; align-items:center; gap:7px 14px; flex-wrap:wrap; }
         .map-legend-item { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:12px; }
         .legend-dot { width:9px; height:9px; border-radius:50%; background:currentColor; box-shadow:0 0 0 2px color-mix(in srgb,currentColor 22%,transparent); }
@@ -563,7 +585,7 @@ class MeshMonitorPanel extends HTMLElement {
         .legend-line.dashed { border-top-style:dashed; }
         .map-tile-state { align-self:center; font-size:12px; text-align:right; }
         .map-layer-status { grid-column:1/-1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-        .map-status { min-width:0; padding:8px 10px; border:1px solid var(--divider-color); border-radius:9px; background:var(--secondary-background-color); color:var(--secondary-text-color); font-size:12px; overflow-wrap:anywhere; }
+        .map-status { min-width:0; padding:8px 10px; border:1px solid var(--divider-color); border-radius:999px; background:var(--secondary-background-color); color:var(--secondary-text-color); font-size:12px; overflow-wrap:anywhere; }
         .map-status::before { content:""; display:inline-block; width:7px; height:7px; margin-right:7px; border-radius:50%; background:var(--secondary-text-color); }
         .map-status.ok::before { background:var(--success-color,#49cf7b); }
         .map-status.bad { color:var(--primary-text-color); font-weight:600; }
@@ -616,13 +638,12 @@ class MeshMonitorPanel extends HTMLElement {
         .node-detail-meta dt { color:var(--secondary-text-color); font-size:12px; }
         .node-detail-meta dd { margin:4px 0 0; overflow-wrap:anywhere; font-size:15px; line-height:1.4; }
         .node-detail-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-        .node-detail-actions a,.node-detail-actions button { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:9px 12px; border-radius:12px; color:var(--primary-color); background:var(--card-background-color); font-weight:650; text-align:center; text-decoration:none; }
+        .node-detail-actions a,.node-detail-actions button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:42px; padding:9px 12px; border:1px solid color-mix(in srgb,var(--divider-color) 82%,transparent); border-radius:12px; color:var(--primary-text-color); background:var(--card-background-color); font-weight:650; text-align:center; text-decoration:none; }
+        .node-detail-actions ha-icon { --mdc-icon-size:19px; }
+        .node-detail-actions .primary { color:var(--primary-color); border-color:color-mix(in srgb,var(--primary-color) 48%,var(--divider-color)); background:color-mix(in srgb,var(--primary-color) 10%,var(--card-background-color)); }
+        .node-detail-actions .warning { color:var(--warning-color,#f5a623); border-color:color-mix(in srgb,var(--warning-color,#f5a623) 46%,var(--divider-color)); background:color-mix(in srgb,var(--warning-color,#f5a623) 9%,var(--card-background-color)); }
         .node-detail-actions button { width:100%; }
-        .node-detail-actions .danger { color:var(--error-color); }
-        .node-detail-more { grid-column:1/-1; position:relative; }
-        .node-detail-more>summary { display:flex; align-items:center; justify-content:center; min-height:42px; padding:9px 12px; border-radius:12px; color:var(--primary-color); background:var(--card-background-color); font-weight:650; cursor:pointer; list-style:none; }
-        .node-detail-more>summary::-webkit-details-marker { display:none; }
-        .node-detail-more-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+        .node-detail-actions .danger { color:var(--error-color); border-color:color-mix(in srgb,var(--error-color) 48%,var(--divider-color)); background:color-mix(in srgb,var(--error-color) 8%,var(--card-background-color)); }
         .node-detail-position-note { margin:0; padding:11px 13px; border-radius:10px; background:var(--card-background-color); font-size:12px; }
         .node-history { display:grid; gap:12px; padding-top:3px; }
         .node-history-head { display:flex; align-items:end; justify-content:space-between; gap:12px; }
@@ -1162,6 +1183,14 @@ class MeshMonitorPanel extends HTMLElement {
         this._render();
       });
     this.shadowRoot
+      .querySelector("#map-reset-filters")
+      ?.addEventListener("click", () => {
+        this._mapProtocol = "all";
+        this._mapSource = "all";
+        this._mapFreshness = "all";
+        this._render();
+      });
+    this.shadowRoot
       .querySelector("#map-position-range")
       ?.addEventListener("change", (event) => {
         this._positionRange = Number(event.target.value);
@@ -1446,19 +1475,21 @@ class MeshMonitorPanel extends HTMLElement {
       links: links.length,
       fixes: trailCount,
     });
-    const state = empty ? `<div class="map-state ${empty.state}" role="status"><div><span class="map-state-label">Map status</span><h2>${empty.title}</h2><p class="muted">${empty.detail}</p></div></div>` : "";
-    const playback = trailCount > 1 ? `<button id="map-position-play">${this._positionPlaying ? "Pause" : "Play"}</button><input id="map-position-progress" aria-label="Position playback" type="range" min="0" max="${trailCount - 1}" value="${Math.min(this._positionIndex, trailCount - 1)}">` : "";
-    const clear = this._positionTrail ? `<button id="map-position-clear">Clear</button>` : "";
+    const filtered = this._mapProtocol !== "all" || this._mapSource !== "all" || this._mapFreshness !== "all";
+    const state = empty ? `<div class="map-state ${empty.state}" role="status"><div><span class="map-state-label">Map status</span><h2>${empty.title}</h2><p class="muted">${empty.detail}</p>${filtered ? `<button id="map-reset-filters"><ha-icon icon="mdi:filter-remove-outline" aria-hidden="true"></ha-icon>Clear filters</button>` : ""}</div></div>` : "";
+    const playback = trailCount > 1 ? `<button id="map-position-play"><ha-icon icon="mdi:${this._positionPlaying ? "pause" : "play"}" aria-hidden="true"></ha-icon>${this._positionPlaying ? "Pause" : "Play"}</button><input id="map-position-progress" aria-label="Position playback" type="range" min="0" max="${trailCount - 1}" value="${Math.min(this._positionIndex, trailCount - 1)}">` : "";
+    const clear = this._positionTrail ? `<button id="map-position-clear"><ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>Clear</button>` : "";
     const trailBad = this._positionTrail?.state === "permission_denied" || this._positionTrail?.state === "error";
     const mapStyle = mapStylePresentation(this._mapStyle);
     return `<link rel="stylesheet" href="/meshmonitor_panel/vendor/leaflet/leaflet.css"><section class="map-shell" aria-label="Mesh map">
+      <div class="map-head"><div><h2>Mesh map</h2><p class="muted">Explore current positions, stored links, and movement history.</p></div><span class="badge">${visible} visible</span></div>
       <div class="map-toolbar" aria-label="Map controls">
-        <div class="map-control-group filters"><span class="map-control-label">Filter</span><select id="map-protocol" aria-label="Node protocol"><option value="all">All nodes (${nodes.length})</option><option value="meshtastic" ${this._mapProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._mapProtocol === "meshcore" ? "selected" : ""}>MeshCore</option></select><select id="map-source" aria-label="Source"><option value="all">All sources</option>${sources.map(([id, name]) => `<option value="${escapeHtml(id)}" ${this._mapSource === id ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select><select id="map-freshness" aria-label="Last-heard age"><option value="all">Any age</option><option value="fresh" ${this._mapFreshness === "fresh" ? "selected" : ""}>Fresh ≤1h</option><option value="stale" ${this._mapFreshness === "stale" ? "selected" : ""}>Stale 1–24h</option><option value="old" ${this._mapFreshness === "old" ? "selected" : ""}>Old</option></select></div>
-        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}">Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}">Neighbor SNR</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit">Locate</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen">⛶</button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
+        <div class="map-control-group filters"><span class="map-control-label">Filter</span><select id="map-protocol" aria-label="Node protocol"><option value="all">All positions (${nodes.length})</option><option value="meshtastic" ${this._mapProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._mapProtocol === "meshcore" ? "selected" : ""}>MeshCore</option><option value="reticulum" ${this._mapProtocol === "reticulum" ? "selected" : ""}>Reticulum</option></select><select id="map-source" aria-label="Source"><option value="all">All sources</option>${sources.map(([id, name]) => `<option value="${escapeHtml(id)}" ${this._mapSource === id ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select><select id="map-freshness" aria-label="Last-heard age"><option value="all">Any age</option><option value="fresh" ${this._mapFreshness === "fresh" ? "selected" : ""}>Fresh ≤1h</option><option value="stale" ${this._mapFreshness === "stale" ? "selected" : ""}>Stale 1–24h</option><option value="old" ${this._mapFreshness === "old" ? "selected" : ""}>Old</option></select></div>
+        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}"><ha-icon icon="mdi:vector-polyline" aria-hidden="true"></ha-icon>Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}"><ha-icon icon="mdi:access-point-network" aria-hidden="true"></ha-icon>Neighbor SNR</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit"><ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>Fit</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen"><ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon></button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
         <div class="map-control-group history"><span class="map-control-label">Trail</span><select id="map-position-range" aria-label="Trail time range">${[[1,"1h"],[6,"6h"],[24,"24h"],[72,"3d"],[168,"7d"]].map(([hours,label]) => `<option value="${hours}" ${this._positionRange === hours ? "selected" : ""}>${label}</option>`).join("")}</select>${playback}${clear}</div>
       </div>
       <div class="map-canvas"><div id="mesh-map" class="map ${mapStyle.className}">${state}</div><span class="map-stat">${mapCountLabel(visible, links.length, trailCount)}</span></div>
-      <div class="map-footer"><div class="map-legend" aria-label="Map legend"><span class="map-legend-item" style="color:var(--protocol-meshtastic)"><i class="legend-dot"></i>Meshtastic</span><span class="map-legend-item" style="color:var(--protocol-meshcore)"><i class="legend-dot"></i>MeshCore</span><span class="map-legend-item" style="color:#48a9ff"><i class="legend-line"></i>Topology</span><span class="map-legend-item" style="color:#d56cff"><i class="legend-line dashed"></i>Neighbor/SNR</span><span class="map-legend-item" style="color:#ffd166"><i class="legend-line"></i>Position trail</span></div><div class="map-tile-state muted">${mapStyle.detail}</div><div class="map-layer-status">${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span></div></div>
+      <div class="map-footer"><div class="map-legend" aria-label="Map legend"><span class="map-legend-item" style="color:var(--protocol-meshtastic)"><i class="legend-dot"></i>Meshtastic</span><span class="map-legend-item" style="color:var(--protocol-meshcore)"><i class="legend-dot"></i>MeshCore</span><span class="map-legend-item" style="color:var(--protocol-reticulum)"><i class="legend-dot"></i>Reticulum</span><span class="map-legend-item" style="color:#48a9ff"><i class="legend-line"></i>Topology</span><span class="map-legend-item" style="color:#d56cff"><i class="legend-line dashed"></i>Neighbor/SNR</span><span class="map-legend-item" style="color:#ffd166"><i class="legend-line"></i>Position trail</span></div><div class="map-tile-state muted">${mapStyle.detail}</div><div class="map-layer-status">${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span></div></div>
     </section>`;
   }
 
@@ -2036,25 +2067,31 @@ class MeshMonitorPanel extends HTMLElement {
     ).join("");
     const actions = [
       presentation.actions.message
-        ? `<button id="node-detail-message">Send Message</button>`
+        ? `<button id="node-detail-message" class="primary"><ha-icon icon="mdi:message-text-outline" aria-hidden="true"></ha-icon>Send message</button>`
         : "",
       presentation.actions.requests
-        ? `<button data-node-request="traceroute" ${requestPending ? "disabled" : ""}>${this._nodeActionPending === "traceroute" ? "Requesting…" : "Trace Route"}</button>`
+        ? `<button data-node-request="traceroute" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:routes" aria-hidden="true"></ha-icon>${this._nodeActionPending === "traceroute" ? "Requesting…" : "Trace route"}</button>`
         : "",
       presentation.actions.requests
-        ? `<button data-node-request="position" ${requestPending ? "disabled" : ""}>${this._nodeActionPending === "position" ? "Requesting…" : "Request Position"}</button>`
+        ? `<button data-node-request="position" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:map-marker-question-outline" aria-hidden="true"></ha-icon>${this._nodeActionPending === "position" ? "Requesting…" : "Request position"}</button>`
         : "",
       presentation.actions.map
-        ? `<button id="node-detail-map">View on map</button>`
+        ? `<button id="node-detail-map" class="primary"><ha-icon icon="mdi:map-marker-outline" aria-hidden="true"></ha-icon>View on map</button>`
         : "",
       presentation.actions.device
-        ? `<a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open HA device</a>`
+        ? `<a href="/config/devices/device/${encodeURIComponent(node.device_id)}"><ha-icon icon="mdi:home-assistant" aria-hidden="true"></ha-icon>Open HA device</a>`
         : "",
-      presentation.actions.requests || presentation.actions.ignore
-        ? `<details class="node-detail-more"><summary>More actions</summary><div class="node-detail-more-menu">${presentation.actions.requests ? `<button data-node-request="nodeinfo" ${requestPending ? "disabled" : ""}>${this._nodeActionPending === "nodeinfo" ? "Requesting…" : "Request Node Information"}</button><button data-node-request="neighbors" ${requestPending ? "disabled" : ""}>${this._nodeActionPending === "neighbors" ? "Requesting…" : "Request Neighbor Information"}</button>` : ""}${presentation.actions.ignore ? `<button id="node-detail-ignore" class="danger" ${requestPending ? "disabled" : ""}>${node.ignored ? "Unignore Node" : "Ignore Node"}</button>` : ""}</div></details>`
+      presentation.actions.requests
+        ? `<button data-node-request="nodeinfo" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>${this._nodeActionPending === "nodeinfo" ? "Requesting…" : "Request node information"}</button>`
+        : "",
+      presentation.actions.requests
+        ? `<button data-node-request="neighbors" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:account-network-outline" aria-hidden="true"></ha-icon>${this._nodeActionPending === "neighbors" ? "Requesting…" : "Request neighbor information"}</button>`
+        : "",
+      presentation.actions.ignore
+        ? `<button id="node-detail-ignore" class="warning" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:${node.ignored ? "eye-outline" : "eye-off-outline"}" aria-hidden="true"></ha-icon>${node.ignored ? "Unignore node" : "Ignore node"}</button>`
         : "",
       presentation.actions.remove
-        ? `<button id="node-detail-remove" class="danger" ${presentation.actions.removeEnabled ? "" : "disabled"} title="${presentation.actions.removeEnabled ? "Remove this node and its stored MeshMonitor history" : "Enable node removal in this source's integration options"}">Remove from MeshMonitor</button>`
+        ? `<button id="node-detail-remove" class="danger" ${presentation.actions.removeEnabled ? "" : "disabled"} title="${presentation.actions.removeEnabled ? "Remove this node and its stored MeshMonitor history" : "Enable node removal in this source's integration options"}"><ha-icon icon="mdi:delete-outline" aria-hidden="true"></ha-icon>Remove from MeshMonitor</button>`
         : "",
     ].filter(Boolean).join("");
     const history = presentation.monitored
@@ -2785,7 +2822,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260823-1120")) {
-  customElements.define("meshmonitor-panel-20260823-1120", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260823-1235")) {
+  customElements.define("meshmonitor-panel-20260823-1235", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

@@ -211,11 +211,15 @@ test("drawer renders capability actions and gates diagnostics to monitored nodes
     "utf8",
   );
   assert.match(panel, /presentation\.actions\.message[\s\S]+node-detail-message/);
-  assert.match(panel, /node-detail-message">Send Message<\/button>/);
-  assert.match(panel, /data-node-request="traceroute"[\s\S]+Trace Route/);
-  assert.match(panel, /data-node-request="position"[\s\S]+Request Position/);
-  assert.match(panel, /Request Node Information[\s\S]+Request Neighbor Information/);
-  assert.match(panel, /id="node-detail-ignore"[\s\S]+Ignore Node/);
+  assert.match(panel, /node-detail-message" class="primary"[\s\S]+Send message<\/button>/);
+  assert.match(panel, /data-node-request="traceroute"[\s\S]+Trace route/);
+  assert.match(panel, /data-node-request="position"[\s\S]+Request position/);
+  assert.match(panel, /Request node information[\s\S]+Request neighbor information/);
+  assert.match(panel, /id="node-detail-ignore" class="warning"[\s\S]+Ignore node/);
+  assert.doesNotMatch(panel, /More actions/);
+  assert.doesNotMatch(panel, /node-detail-more/);
+  assert.match(panel, /mdi:message-text-outline/);
+  assert.match(panel, /mdi:delete-outline/);
   assert.match(panel, /does not confirm that the node replied/);
   assert.match(panel, /<span>RSSI<\/span>[\s\S]+<span>SNR<\/span>/);
   assert.match(panel, /presentation\.actions\.map[\s\S]+node-detail-map/);

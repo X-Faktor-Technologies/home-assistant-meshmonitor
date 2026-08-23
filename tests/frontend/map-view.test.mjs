@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   MAP_STYLE_STORAGE,
@@ -93,4 +94,19 @@ test("map style presentation enables tiles only for the two tile styles", () => 
   assert.match(mapStylePresentation("neutral-dark").detail, /Near-black/);
   assert.equal(mapStylePresentation("tiles-off").tiles, false);
   assert.equal(mapStylePresentation("invalid").value, "neutral-dark");
+});
+
+test("map polish includes Reticulum positions, clear filters, and accessible icon controls", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /_allMapNodes\(\)/);
+  assert.match(panel, /source\.reticulum\?\.peers/);
+  assert.match(panel, /value="reticulum"[\s\S]+Reticulum/);
+  assert.match(panel, /id="map-reset-filters"/);
+  assert.match(panel, /mdi:filter-remove-outline/);
+  assert.match(panel, /mdi:crosshairs-gps/);
+  assert.match(panel, /--protocol-reticulum/);
 });
