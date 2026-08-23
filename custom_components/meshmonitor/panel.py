@@ -16,8 +16,8 @@ from homeassistant.core import HomeAssistant
 from .const import PANEL_URL_PATH
 
 PANEL_STATIC_URL = "/meshmonitor_panel"
-PANEL_URL = f"{PANEL_STATIC_URL}/meshmonitor-panel.js?v=20260822-1545"
-PANEL_ELEMENT = "meshmonitor-panel-20260822-1545"
+PANEL_URL = f"{PANEL_STATIC_URL}/meshmonitor-panel.js?v=20260823-1120"
+PANEL_ELEMENT = "meshmonitor-panel-20260823-1120"
 PANEL_PATH = str(Path(__file__).parent / "frontend")
 
 _static_path_registered = False

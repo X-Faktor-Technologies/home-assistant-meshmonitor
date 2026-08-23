@@ -91,6 +91,27 @@ test("direct identity uses the stable remote node in both directions", () => {
   assert.equal(messageConversationKey(outgoing), "direct:meshtastic:!0000002a");
 });
 
+test("Reticulum conversations use announced friendly names instead of hashes", () => {
+  const peerHash = "0123456789abcdef0123456789abcdef";
+  const reticulum = {
+    ...SOURCE,
+    protocol: "reticulum",
+    nodes: [],
+    reticulum: { peers: [{ id: peerHash, name: "Elier's LXMF" }] },
+  };
+  const incoming = {
+    protocol: "reticulum",
+    channel: -1,
+    from_id: peerHash,
+    to_id: "fedcba9876543210fedcba9876543210",
+  };
+
+  assert.equal(
+    messageConversationCatalog([incoming], [reticulum])[0].name,
+    "Elier's LXMF",
+  );
+});
+
 test("source choices are exact, explicit, fresh, and destination compatible", () => {
   const now = Date.parse("2026-08-17T19:02:00Z");
   const conversation = messageConversationCatalog(HISTORY, [SOURCE])[0];

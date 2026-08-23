@@ -81,6 +81,29 @@ test("missing values remain last in either direction", () => {
     );
 });
 
+test("role is a supported node-table sort key", () => {
+  const nodes = [
+    { id: "router", name: "Router", role: "ROUTER" },
+    { id: "client", name: "Client", role: "CLIENT" },
+  ];
+  assert.deepEqual(
+    sortNodes(nodes, "role", "asc").map((node) => node.id),
+    ["client", "router"],
+  );
+});
+
+test("node column headings expose clickable sorting and direction state", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /data-node-sort-key="\$\{key\}"/);
+  assert.match(panel, /aria-sort="\$\{ariaSort\}"/);
+  assert.match(panel, /this\._nodeDirection === "asc" \? "desc" : "asc"/);
+  assert.match(panel, /node-sort-indicator/);
+});
+
 test("materially future last-heard values are unavailable for ordering", () => {
   const nodes = [
     { id: "future", name: "Future", last_heard: NOW + 60001 },

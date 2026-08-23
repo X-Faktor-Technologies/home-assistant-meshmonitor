@@ -90,6 +90,8 @@ const sortValue = (node, key, now) => {
       return node.hops ?? null;
     case "protocol":
       return node.protocol?.toLowerCase() || null;
+    case "role":
+      return node.role?.toLowerCase() || null;
     default:
       return node.name?.toLowerCase() || null;
   }

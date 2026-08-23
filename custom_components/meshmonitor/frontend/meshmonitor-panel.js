@@ -3,7 +3,7 @@ import {
   relativeNodeActivity,
   relativeNodeTime,
   sortNodes,
-} from "./node-table.js?v=20260819-2108";
+} from "./node-table.js?v=20260823-1120";
 import {
   batteryPresentation,
   hardwareModelLabel,
@@ -50,7 +50,7 @@ import {
   messageSendNonce,
   messageTimestampMs,
   sendErrorPresentation,
-} from "./message-view.js?v=20260819-2108";
+} from "./message-view.js?v=20260823-1120";
 import {
   PANEL_TABS,
   adjacentPanelTab,
@@ -678,10 +678,13 @@ class MeshMonitorPanel extends HTMLElement {
         .conversation-head .title .muted { margin-top:3px; font-size:12px; }
         .conversation-actions { min-width:0; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
         .conversation-actions select,.conversation-actions button { min-height:34px; padding:6px 9px; border-radius:8px; font-size:12px; }
-        .notification-bell { position:relative; flex:0 0 46px; align-self:center; width:46px; height:40px; margin-left:8px; padding:8px; border:0; border-radius:0; background:transparent; box-shadow:none; line-height:1; }
+        .notification-bell { position:relative; flex:0 0 32px; align-self:center; width:32px; height:34px; margin:0; padding:5px; border:0; border-radius:0; background:transparent; box-shadow:none; line-height:1; }
         .notification-bell:hover,.notification-bell:focus-visible { background:color-mix(in srgb,var(--primary-color) 10%,transparent); }
         .notification-bell svg { width:23px; height:23px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
         .notification-bell.enabled svg { fill:currentColor; stroke:none; }
+        .node-sort-button { width:100%; margin:0; padding:0; display:inline-flex; align-items:center; gap:5px; border:0; border-radius:0; background:transparent; color:inherit; font:inherit; font-weight:inherit; text-align:left; }
+        .node-sort-button:hover,.node-sort-button:focus-visible { color:var(--primary-color); background:transparent; }
+        .node-sort-indicator { min-width:10px; color:var(--primary-color); }
         .notification-scrim { position:fixed; inset:0; z-index:1002; display:grid; place-items:center; padding:20px; background:#0009; }
         .notification-dialog { width:min(480px,100%); overflow:hidden; border:1px solid var(--divider-color); border-radius:16px; background:var(--card-background-color); box-shadow:0 20px 70px #0008; }
         .notification-dialog-head { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:17px 21px 13px; border-bottom:1px solid var(--divider-color); }
@@ -895,6 +898,20 @@ class MeshMonitorPanel extends HTMLElement {
         this._render();
       });
     }
+    this.shadowRoot.querySelectorAll("[data-node-sort-key]").forEach((button) =>
+      button.addEventListener("click", () => {
+        const key = button.dataset.nodeSortKey;
+        if (this._nodeSort === key)
+          this._nodeDirection = this._nodeDirection === "asc" ? "desc" : "asc";
+        else {
+          this._nodeSort = key;
+          this._nodeDirection = key === "last_heard" ? "desc" : "asc";
+        }
+        localStorage.setItem("meshmonitor.nodes.sort", this._nodeSort);
+        localStorage.setItem("meshmonitor.nodes.direction", this._nodeDirection);
+        this._render();
+      }),
+    );
     this.shadowRoot.querySelectorAll("[data-favorite-node]").forEach((button) =>
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1929,7 +1946,15 @@ class MeshMonitorPanel extends HTMLElement {
           })
           .join("")
       : `<tr><td colspan="8" class="map-empty">${nodes.length ? "No nodes match these filters." : "No nodes are available in the current source snapshots."}</td></tr>`;
-    return `<div class="toolbar"><div class="search-field"><input id="search" aria-label="Search nodes" value="${escapeHtml(this._query)}" placeholder="Search names, IDs, roles, or hardware"><button type="button" id="clear-node-search" class="search-clear" aria-label="Clear node search" title="Clear search" ${this._query ? "" : "hidden"}>×</button></div><select id="node-protocol" aria-label="Filter nodes by protocol"><option value="all">All protocols</option><option value="meshtastic" ${this._nodeProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._nodeProtocol === "meshcore" ? "selected" : ""}>MeshCore</option></select><select id="node-favorite" aria-label="Filter favorite nodes"><option value="all">All nodes</option><option value="favorites" ${this._nodeFavorite !== "all" ? "selected" : ""}>Favorites only</option></select><select id="node-position" aria-label="Filter positioned nodes"><option value="all">Any position</option><option value="positioned" ${this._nodePosition !== "all" ? "selected" : ""}>Positioned only</option></select><select id="node-sort" aria-label="Sort nodes by">${[["name","Name"],["last_heard","Last seen"],["battery","Battery"],["signal","Signal"],["hops","Hops"],["protocol","Protocol"]].map(([v,n])=>`<option value="${v}" ${this._nodeSort===v?"selected":""}>${n}</option>`).join("")}</select><select id="node-direction" aria-label="Node sort direction"><option value="asc" ${this._nodeDirection==="asc"?"selected":""}>Ascending</option><option value="desc" ${this._nodeDirection==="desc"?"selected":""}>Descending</option></select></div><div class="table nodes-table"><table><thead><tr><th class="node-favorite" aria-label="Favorite">★</th><th class="node-name">Name</th><th class="node-protocol">Protocol</th><th class="node-last-heard">Last seen</th><th class="node-power">Battery</th><th class="node-signal">Signal</th><th class="node-hops">Hops</th><th class="node-role">Role</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Showing ${filtered.length} of ${nodes.length} nodes. Select a row for details. Favorites stay first; sort preferences are saved in this browser.</p>`;
+    const sortHeader = (key, label, className) => {
+      const active = this._nodeSort === key;
+      const direction = active ? this._nodeDirection : "none";
+      const indicator = active ? (direction === "asc" ? "▲" : "▼") : "";
+      const nextDirection = active && direction === "asc" ? "descending" : "ascending";
+      const ariaSort = direction === "none" ? "none" : direction === "asc" ? "ascending" : "descending";
+      return `<th class="${className}" aria-sort="${ariaSort}"><button type="button" class="node-sort-button" data-node-sort-key="${key}" aria-label="Sort by ${label}, ${nextDirection}">${label}<span class="node-sort-indicator" aria-hidden="true">${indicator}</span></button></th>`;
+    };
+    return `<div class="toolbar"><div class="search-field"><input id="search" aria-label="Search nodes" value="${escapeHtml(this._query)}" placeholder="Search names, IDs, roles, or hardware"><button type="button" id="clear-node-search" class="search-clear" aria-label="Clear node search" title="Clear search" ${this._query ? "" : "hidden"}>×</button></div><select id="node-protocol" aria-label="Filter nodes by protocol"><option value="all">All protocols</option><option value="meshtastic" ${this._nodeProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._nodeProtocol === "meshcore" ? "selected" : ""}>MeshCore</option></select><select id="node-favorite" aria-label="Filter favorite nodes"><option value="all">All nodes</option><option value="favorites" ${this._nodeFavorite !== "all" ? "selected" : ""}>Favorites only</option></select><select id="node-position" aria-label="Filter positioned nodes"><option value="all">Any position</option><option value="positioned" ${this._nodePosition !== "all" ? "selected" : ""}>Positioned only</option></select><select id="node-sort" aria-label="Sort nodes by">${[["name","Name"],["last_heard","Last seen"],["battery","Battery"],["signal","Signal"],["hops","Hops"],["protocol","Protocol"],["role","Role"]].map(([v,n])=>`<option value="${v}" ${this._nodeSort===v?"selected":""}>${n}</option>`).join("")}</select><select id="node-direction" aria-label="Node sort direction"><option value="asc" ${this._nodeDirection==="asc"?"selected":""}>Ascending</option><option value="desc" ${this._nodeDirection==="desc"?"selected":""}>Descending</option></select></div><div class="table nodes-table"><table><thead><tr><th class="node-favorite" aria-label="Favorite">★</th>${sortHeader("name", "Name", "node-name")}${sortHeader("protocol", "Protocol", "node-protocol")}${sortHeader("last_heard", "Last seen", "node-last-heard")}${sortHeader("battery", "Battery", "node-power")}${sortHeader("signal", "Signal", "node-signal")}${sortHeader("hops", "Hops", "node-hops")}${sortHeader("role", "Role", "node-role")}</tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Showing ${filtered.length} of ${nodes.length} nodes. Select a row for details. Favorites stay first; sort preferences are saved in this browser.</p>`;
   }
 
   _trendCard(label, unit, points, extraClass = "") {
@@ -2760,7 +2785,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260822-1545")) {
-  customElements.define("meshmonitor-panel-20260822-1545", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260823-1120")) {
+  customElements.define("meshmonitor-panel-20260823-1120", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

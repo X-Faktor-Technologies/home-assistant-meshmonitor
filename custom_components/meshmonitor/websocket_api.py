@@ -346,6 +346,14 @@ def _serialize_entry(
                 "mode": snapshot.status.mode,
                 "identity_name": identity.display_name if identity else None,
                 "identity_hash": identity.destination_hash if identity else None,
+                "peers": [
+                    {
+                        "id": destination.destination_hash,
+                        "name": destination.display_name,
+                    }
+                    for destination in snapshot.destinations
+                    if destination.display_name
+                ],
             },
             "firmware_update": update_presentation(
                 source_type, None, firmware_releases or {}
