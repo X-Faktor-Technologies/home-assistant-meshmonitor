@@ -34,6 +34,6 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = true
 packages = ["custom_components.meshmonitor"]
