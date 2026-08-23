@@ -21,7 +21,6 @@ from custom_components.meshmonitor.const import (
     CONF_ENABLE_FAVORITES,
     CONF_ENABLE_MESSAGE_POLLING,
     CONF_ENABLE_NODE_MANAGEMENT,
-    CONF_ENABLE_NODE_REMOVAL,
     CONF_ENABLE_SIDEBAR_PANEL,
     CONF_ENABLE_TRANSMIT,
     CONF_EXPOSE_MESSAGE_TEXT,
@@ -246,7 +245,6 @@ async def test_server_and_source_options_remain_isolated(hass: HomeAssistant) ->
         CONF_ENABLE_TRANSMIT,
         CONF_ENABLE_NODE_MANAGEMENT,
         CONF_AUTOMATED_TX_UTILIZATION_LIMIT,
-        CONF_ENABLE_NODE_REMOVAL,
     }
     result = await hass.config_entries.options.async_configure(
         source_form["flow_id"],
@@ -259,7 +257,6 @@ async def test_server_and_source_options_remain_isolated(hass: HomeAssistant) ->
             CONF_ENABLE_TRANSMIT: False,
             CONF_ENABLE_NODE_MANAGEMENT: False,
             CONF_AUTOMATED_TX_UTILIZATION_LIMIT: 35,
-            CONF_ENABLE_NODE_REMOVAL: False,
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY

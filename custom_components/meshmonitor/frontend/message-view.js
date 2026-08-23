@@ -221,6 +221,12 @@ export const messageTimestampMs = (message) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+export const sortMessagesChronologically = (messages) =>
+  [...messages].sort((left, right) => {
+    const time = messageTimestampMs(left) - messageTimestampMs(right);
+    return time || String(left.id || "").localeCompare(String(right.id || ""));
+  });
+
 const normalizedPeerId = (value) => String(value || "").toLowerCase();
 
 export const messageSenderName = (message, sources = []) => {

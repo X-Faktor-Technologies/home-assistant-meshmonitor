@@ -89,8 +89,7 @@
         "enable_favorites": "Allow server-persistent favorites (requires nodes:write; never syncs Meshtastic favorites to the radio)",
         "enable_transmit": "Enable outbound messages for this source",
         "enable_node_management": "Allow automation actions to favorite or ignore nodes (server-only; never syncs Meshtastic state to the radio)",
-        "automated_tx_utilization_limit": "Pause automated transmissions at or above channel utilization (%) — 0 disables",
-        "enable_node_removal": "Allow removing remote Meshtastic nodes and stored history from MeshMonitor (requires messages:write)"
+        "automated_tx_utilization_limit": "Pause automated transmissions at or above channel utilization (%) — 0 disables"
       }
       },
       "refresh_source_inventory": {

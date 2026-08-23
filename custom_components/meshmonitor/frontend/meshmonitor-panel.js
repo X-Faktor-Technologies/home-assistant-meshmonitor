@@ -49,8 +49,9 @@ import {
   messagePresentation,
   messageSendNonce,
   messageTimestampMs,
+  sortMessagesChronologically,
   sendErrorPresentation,
-} from "./message-view.js?v=20260823-1235";
+} from "./message-view.js?v=20260823-1752";
 import {
   PANEL_TABS,
   adjacentPanelTab,
@@ -2485,7 +2486,7 @@ class MeshMonitorPanel extends HTMLElement {
         this._conversationLastRead[item.key] ?? this._lastRead,
       ])),
     );
-    const filtered = messages.filter(
+    const filtered = sortMessagesChronologically(messages.filter(
       (message) =>
         (this._conversation === "all" || this._conversationKey(message) === this._conversation) &&
         (this._messageProtocol === "all" ||
@@ -2500,7 +2501,7 @@ class MeshMonitorPanel extends HTMLElement {
         `${message.from_name || ""} ${message.from_id || ""} ${message.channel_name || ""} ${message.text || ""}`
           .toLowerCase()
           .includes(query) && (!this._messageUnread || this._messageTime(message) > this._messageReadAt(message)) && (!this._messageFavorite || favoriteIds.has(message.from_id)),
-    ).sort((a,b) => this._messageTime(a)-this._messageTime(b));
+    ));
     const selected = catalog.find((item) => item.key === this._conversation);
     this._pendingMessages = this._pendingMessages.filter((pending) => {
       if (pending.state !== "queued") return true;
@@ -2792,7 +2793,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260823-1453")) {
-  customElements.define("meshmonitor-panel-20260823-1453", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260823-1752")) {
+  customElements.define("meshmonitor-panel-20260823-1752", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
