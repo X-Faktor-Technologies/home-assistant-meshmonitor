@@ -126,7 +126,7 @@
       "fields": {
         "source_device_id": {"name": "Source device", "description": "The local MeshMonitor radio source that will transmit the message."},
         "destination_device_id": {"name": "Known destination node", "description": "One Home Assistant node device belonging to the selected source. Use either this field or Recipient ID or exact name."},
-        "recipient": {"name": "Recipient ID or exact name", "description": "Alternative to Known destination node. Enter an exact long name or short name currently known by the selected source, a Meshtastic node ID (! followed by 8 hexadecimal digits), or a 64-digit MeshCore public key."},
+        "recipient": {"name": "Recipient ID or exact name", "description": "Alternative to Known destination node. Enter an exact known name, a Meshtastic node ID (! followed by 8 hexadecimal digits), a 64-digit MeshCore public key, or a 32-digit Reticulum destination hash."},
         "text": {"name": "Message", "description": "Text to send. Protocol-specific length limits are validated before transmission."},
         "reply_id": {"name": "Reply to message ID (optional)", "description": "Meshtastic only. Use the triggering message ID to preserve reply linkage."}
       }

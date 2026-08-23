@@ -132,6 +132,28 @@ test("source choices are exact, explicit, fresh, and destination compatible", ()
   assert.match(choices[3].reason, /option is off/);
 });
 
+test("Reticulum peers are eligible direct-message destinations", () => {
+  const now = Date.parse("2026-08-17T19:02:00Z");
+  const peerHash = "0123456789abcdef0123456789abcdef";
+  const source = {
+    ...SOURCE,
+    protocol: "reticulum",
+    nodes: [],
+    reticulum: { peers: [{ id: peerHash, name: "Friendly peer" }] },
+  };
+  const conversation = {
+    key: `direct:reticulum:${peerHash}`,
+    type: "direct",
+    protocol: "reticulum",
+    recipient: peerHash,
+  };
+
+  const choices = conversationSourceChoices(conversation, [source], now);
+
+  assert.equal(choices.length, 1);
+  assert.equal(choices[0].enabled, true);
+});
+
 test("unknown direct targets and unsupported protocols stay non-sendable", () => {
   const unknown = { key: "direct:meshtastic:unknown", type: "direct", protocol: "meshtastic", recipient: "unknown" };
   const unsupported = { key: "channel:meshcore:0", type: "channel", protocol: "meshcore", channel: 0 };
@@ -144,6 +166,7 @@ test("UTF-8 limits use encoded bytes at exact protocol boundaries", () => {
   assert.equal(messageByteLimit("meshtastic", "direct"), 200);
   assert.equal(messageByteLimit("meshcore", "channel"), 130);
   assert.equal(messageByteLimit("meshcore", "direct"), 150);
+  assert.equal(messageByteLimit("reticulum", "direct"), 4096);
   assert.equal(messageDraftValidation("é".repeat(75), "meshcore", "direct").valid, true);
   assert.equal(messageDraftValidation("é".repeat(76), "meshcore", "direct").valid, false);
   assert.equal(messageDraftValidation("\n", "meshtastic", "channel").valid, false);

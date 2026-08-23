@@ -41,6 +41,7 @@ from .const import (
     NODE_DEVICE_POLICY_FAVORITES,
     SOURCE_TYPE_MESHCORE,
     SOURCE_TYPE_MESHTASTIC,
+    SOURCE_TYPE_RETICULUM,
 )
 from .firmware_updates import update_presentation
 from .notification_manager import MeshMonitorNotificationManager
@@ -349,16 +350,24 @@ def _serialize_entry(
                 "peers": [
                     {
                         "id": destination.destination_hash,
-                        "name": destination.display_name,
+                        "name": destination.display_name or destination.destination_hash,
+                        "app_name": destination.app_name,
+                        "last_seen": destination.last_seen,
+                        "latitude": destination.latitude,
+                        "longitude": destination.longitude,
+                        "altitude": destination.altitude,
+                        "rssi": destination.rssi,
+                        "snr": destination.snr,
+                        "hops": destination.hops,
+                        "favorite": destination.is_favorite,
                     }
                     for destination in snapshot.destinations
-                    if destination.display_name
                 ],
             },
             "firmware_update": update_presentation(
                 source_type, None, firmware_releases or {}
             ),
-            "transmit_enabled": False,
+            "transmit_enabled": bool(entry.options.get(CONF_ENABLE_TRANSMIT, False)),
             "favorites_enabled": False,
             "node_management_enabled": False,
             "node_removal_enabled": False,
@@ -969,7 +978,7 @@ async def websocket_get_node_history(
         vol.Required("type"): "meshmonitor/send_message",
         vol.Required("source_id"): str,
         vol.Optional("entry_id"): str,
-        vol.Required("protocol"): vol.In(("meshtastic", "meshcore")),
+        vol.Required("protocol"): vol.In(("meshtastic", "meshcore", "reticulum")),
         vol.Required("text"): str,
         vol.Required("nonce"): vol.All(str, vol.Length(min=16, max=64)),
         vol.Required("confirm"): "SEND",
@@ -1016,27 +1025,36 @@ async def websocket_send_message(
         """Finish the one reviewed send independently of the browser socket."""
         client = entry.runtime_data.client
         try:
-            if source_type == SOURCE_TYPE_MESHCORE:
-                result = await client.send_meshcore_message(
+            if source_type == SOURCE_TYPE_RETICULUM:
+                reticulum_result = await client.send_reticulum_message(
+                    msg["source_id"],
+                    msg["text"],
+                    to_destination_hash=msg.get("destination", ""),
+                )
+                delivery_state = reticulum_result.state
+            elif source_type == SOURCE_TYPE_MESHCORE:
+                meshcore_result = await client.send_meshcore_message(
                     msg["source_id"],
                     msg["text"],
                     channel=msg.get("channel"),
                     to_public_key=msg.get("destination"),
                 )
+                delivery_state = meshcore_result.delivery_state
             else:
-                result = await client.send_meshtastic_message(
+                meshtastic_result = await client.send_meshtastic_message(
                     msg["source_id"],
                     msg["text"],
                     channel=msg.get("channel"),
                     to_node_id=msg.get("destination"),
                 )
+                delivery_state = meshtastic_result.delivery_state
         except Exception as exc:  # Result is retained without automatic retry.
             _LOGGER.error("Background MeshMonitor send failed: %s", type(exc).__name__)
             return
         _LOGGER.info(
             "Background MeshMonitor send accepted for source %s (%s)",
             msg["source_id"],
-            result.delivery_state or "accepted",
+            delivery_state or "accepted",
         )
         message_runtime = (
             hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
