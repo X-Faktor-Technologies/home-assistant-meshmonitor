@@ -495,7 +495,7 @@ class MeshMonitorClient:
             raise ValueError("node_id must be ! followed by 8 hexadecimal digits")
         node_num = int(node_id[1:], 16)
         payload = await self._delete_json(
-            f"/api/nodes/{node_num}?{urlencode({'sourceId': source_id})}"
+            f"/api/messages/nodes/{node_num}?{urlencode({'sourceId': source_id})}"
         )
         return NodeDeleteResult.from_dict(payload)
 

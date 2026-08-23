@@ -26,7 +26,7 @@ def test_only_explicit_bounded_write_routes_exist() -> None:
     assert source.count("session.delete(") == 1
     assert '_source_path(source_id, "messages")' in source
     assert '_meshcore_path(source_id, "messages/send")' in source
-    assert 'f"/api/nodes/{node_num}?{urlencode' in source
+    assert 'f"/api/messages/nodes/{node_num}?{urlencode' in source
     assert 'CONF_ENABLE_NODE_REMOVAL' in source
     services = (COMPONENT / "services.yaml").read_text()
     assert services.count("send_direct_message:") == 1
