@@ -263,10 +263,6 @@ export function nodeDetailPresentation(node, source, canSendMessages = false) {
         source?.node_management_enabled === true &&
         !monitored,
       device: Boolean(node?.device_id),
-      remove:
-        String(source?.protocol || "").toLowerCase() === "meshtastic" &&
-        !monitored,
-      removeEnabled: source?.node_removal_enabled === true,
     },
   };
 }

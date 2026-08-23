@@ -110,3 +110,15 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.match(panel, /mdi:crosshairs-gps/);
   assert.match(panel, /--protocol-reticulum/);
 });
+
+test("map node popup opens the matching panel node details instead of MeshMonitor", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, />View node details<\/button>/);
+  assert.match(panel, /data-map-node-detail/);
+  assert.match(panel, /_nodeDetailFromMap\(/);
+  assert.doesNotMatch(panel, /Open source nodes in MeshMonitor/);
+});

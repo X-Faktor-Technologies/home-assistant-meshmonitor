@@ -13,7 +13,7 @@ import {
   normalizeHistoryPoints,
   sparklinePoints,
   telemetrySeries,
-} from "./node-detail.js?v=20260821-0910";
+} from "./node-detail.js?v=20260823-1453";
 import {
   overviewAttentionItems,
   overviewHealthPresentation,
@@ -181,7 +181,6 @@ class MeshMonitorPanel extends HTMLElement {
       this._nodeActionStatus = "";
       this._nodeActionPending = "";
       this._nodeIgnoreReview = false;
-      this._nodeRemovalReview = false;
       this._nodeDirectTarget = null;
       this._mapFocusNode = null;
       this._nodeHistory = null;
@@ -644,7 +643,6 @@ class MeshMonitorPanel extends HTMLElement {
         .node-detail-actions .warning { color:var(--warning-color,#f5a623); border-color:color-mix(in srgb,var(--warning-color,#f5a623) 46%,var(--divider-color)); background:color-mix(in srgb,var(--warning-color,#f5a623) 9%,var(--card-background-color)); }
         .node-detail-actions button { width:100%; }
         .node-detail-actions .danger { color:var(--error-color); border-color:color-mix(in srgb,var(--error-color) 48%,var(--divider-color)); background:color-mix(in srgb,var(--error-color) 8%,var(--card-background-color)); }
-        .node-detail-actions #node-detail-remove { grid-column:2; }
         .node-detail-position-note { margin:0; padding:11px 13px; border-radius:10px; background:var(--card-background-color); font-size:12px; }
         .node-history { display:grid; gap:12px; padding-top:3px; }
         .node-history-head { display:flex; align-items:end; justify-content:space-between; gap:12px; }
@@ -779,7 +777,7 @@ class MeshMonitorPanel extends HTMLElement {
         .reply-state { flex:none; padding:5px 8px; border:1px solid var(--divider-color); border-radius:999px; background:var(--secondary-background-color); font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
         @media(max-width:1100px){.map-toolbar{grid-template-columns:minmax(0,1fr) auto}.map-control-group.filters{grid-column:1/-1}.map-control-group.history{justify-self:end}.conversation-head{align-items:flex-start;flex-wrap:wrap}.conversation-actions{flex:1 1 100%;justify-content:flex-start}.automation-grid{grid-template-columns:1fr}}
         @media(max-width:760px){.tab-bar{padding-left:0}.sidebar-toggle{display:flex}}
-        @media(max-width:760px){ main{padding-left:10px;padding-right:10px}nav{gap:14px;padding:0 10px;overflow-x:auto}nav button{min-width:max-content;padding:10px 0 9px;font-size:12px}.section-heading{align-items:start;flex-direction:column;gap:8px}.overview{gap:17px}.overview-hero{grid-template-columns:1fr;gap:16px;padding:21px 19px}.overview-state{width:max-content}.overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.overview-metric{padding:15px 14px}.overview-metric .metric{font-size:26px}.overview-section-head{align-items:start;flex-direction:column}.overview-protocols{justify-content:flex-start}.overview-sources{grid-template-columns:1fr;gap:12px}.map-toolbar{display:flex;align-items:stretch;gap:9px;flex-direction:column;padding:10px}.map-control-group{width:100%;gap:6px}.map-control-group.filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.map-control-group.filters .map-control-label{grid-column:1/-1}.map-control-group.filters select{width:100%;padding-left:7px;padding-right:7px;font-size:12px}.map-control-row{display:flex;align-items:stretch;flex-direction:column;gap:9px}.map-control-group.layers,.map-control-group.view{width:100%;display:flex;flex-wrap:wrap}.map-control-group.layers .map-control-label,.map-control-group.view .map-control-label{flex-basis:100%}.map-control-group.view select{min-width:0;flex:1}.map-control-group.history{justify-content:flex-start;overflow-x:auto;padding:2px}.map-control-label{font-size:9px}.map-toolbar button{padding-left:9px;padding-right:9px}.map-toolbar input[type="range"]{min-width:84px;flex:1}.map,.map.leaflet-container{height:58vh;min-height:410px}.map-stat{top:9px;right:9px}.map-footer{grid-template-columns:1fr;padding:10px}.map-legend{gap:7px 12px}.map-tile-state{text-align:left}.map-layer-status{grid-template-columns:1fr;gap:6px}.toolbar select,.toolbar button{flex:1}.nodes-table{overflow:visible}.nodes-table table{min-width:0;table-layout:fixed}.nodes-table th,.nodes-table td{padding:10px 7px}.nodes-table .node-protocol,.nodes-table .node-power,.nodes-table .node-signal,.nodes-table .node-hops,.nodes-table .node-role{display:none}.nodes-table .node-name{width:auto;min-width:0;overflow-wrap:anywhere}.nodes-table .node-mobile-protocol{display:block}.nodes-table .node-favorite{width:52px}.nodes-table .node-last-heard{width:82px}.last-heard{white-space:normal}.node-detail-head{padding:16px 14px 13px}.node-detail-body{padding:14px}.node-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.node-detail-groups,.node-detail-actions{grid-template-columns:1fr}.node-detail-actions #node-detail-remove{grid-column:1}.node-history-head{align-items:stretch;flex-direction:column}.node-history-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}.conversation-shell{height:auto;min-height:0;display:block;overflow:hidden}.conversation-rail{display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--divider-color)}.conversation-search{position:sticky;left:0;z-index:3;min-width:155px;padding:9px}.conversation-item{min-width:158px;max-width:180px;padding:10px;border-right:1px solid var(--divider-color)}.conversation-rail .rail-heading{display:none}.conversation-label small{display:block}.conversation-pane{height:calc(100vh - 294px);min-height:540px}.conversation-head{padding:11px;gap:8px}.conversation-head>.conversation-icon{display:none}.conversation-head .title{min-width:0;flex:1 1 100%}.conversation-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;flex:1 1 100%;width:100%;justify-content:stretch}.conversation-actions select{width:100%;min-width:0}.conversation-actions #mark-read{grid-column:1/-1}.messages{padding:12px}.message{width:100%;max-width:100%!important;padding:13px 14px}.message-head{align-items:flex-start;flex-wrap:wrap}.compose-grid{grid-template-columns:1fr} }
+        @media(max-width:760px){ main{padding-left:10px;padding-right:10px}nav{gap:14px;padding:0 10px;overflow-x:auto}nav button{min-width:max-content;padding:10px 0 9px;font-size:12px}.section-heading{align-items:start;flex-direction:column;gap:8px}.overview{gap:17px}.overview-hero{grid-template-columns:1fr;gap:16px;padding:21px 19px}.overview-state{width:max-content}.overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.overview-metric{padding:15px 14px}.overview-metric .metric{font-size:26px}.overview-section-head{align-items:start;flex-direction:column}.overview-protocols{justify-content:flex-start}.overview-sources{grid-template-columns:1fr;gap:12px}.map-toolbar{display:flex;align-items:stretch;gap:9px;flex-direction:column;padding:10px}.map-control-group{width:100%;gap:6px}.map-control-group.filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.map-control-group.filters .map-control-label{grid-column:1/-1}.map-control-group.filters select{width:100%;padding-left:7px;padding-right:7px;font-size:12px}.map-control-row{display:flex;align-items:stretch;flex-direction:column;gap:9px}.map-control-group.layers,.map-control-group.view{width:100%;display:flex;flex-wrap:wrap}.map-control-group.layers .map-control-label,.map-control-group.view .map-control-label{flex-basis:100%}.map-control-group.view select{min-width:0;flex:1}.map-control-group.history{justify-content:flex-start;overflow-x:auto;padding:2px}.map-control-label{font-size:9px}.map-toolbar button{padding-left:9px;padding-right:9px}.map-toolbar input[type="range"]{min-width:84px;flex:1}.map,.map.leaflet-container{height:58vh;min-height:410px}.map-stat{top:9px;right:9px}.map-footer{grid-template-columns:1fr;padding:10px}.map-legend{gap:7px 12px}.map-tile-state{text-align:left}.map-layer-status{grid-template-columns:1fr;gap:6px}.toolbar select,.toolbar button{flex:1}.nodes-table{overflow:visible}.nodes-table table{min-width:0;table-layout:fixed}.nodes-table th,.nodes-table td{padding:10px 7px}.nodes-table .node-protocol,.nodes-table .node-power,.nodes-table .node-signal,.nodes-table .node-hops,.nodes-table .node-role{display:none}.nodes-table .node-name{width:auto;min-width:0;overflow-wrap:anywhere}.nodes-table .node-mobile-protocol{display:block}.nodes-table .node-favorite{width:52px}.nodes-table .node-last-heard{width:82px}.last-heard{white-space:normal}.node-detail-head{padding:16px 14px 13px}.node-detail-body{padding:14px}.node-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.node-detail-groups,.node-detail-actions{grid-template-columns:1fr}.node-history-head{align-items:stretch;flex-direction:column}.node-history-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}.conversation-shell{height:auto;min-height:0;display:block;overflow:hidden}.conversation-rail{display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--divider-color)}.conversation-search{position:sticky;left:0;z-index:3;min-width:155px;padding:9px}.conversation-item{min-width:158px;max-width:180px;padding:10px;border-right:1px solid var(--divider-color)}.conversation-rail .rail-heading{display:none}.conversation-label small{display:block}.conversation-pane{height:calc(100vh - 294px);min-height:540px}.conversation-head{padding:11px;gap:8px}.conversation-head>.conversation-icon{display:none}.conversation-head .title{min-width:0;flex:1 1 100%}.conversation-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;flex:1 1 100%;width:100%;justify-content:stretch}.conversation-actions select{width:100%;min-width:0}.conversation-actions #mark-read{grid-column:1/-1}.messages{padding:12px}.message{width:100%;max-width:100%!important;padding:13px 14px}.message-head{align-items:flex-start;flex-wrap:wrap}.compose-grid{grid-template-columns:1fr} }
         @media(max-width:760px){
           .overview-hero { display:grid; gap:12px; padding:16px; }
           .overview-hero-actions { align-items:flex-start; }
@@ -1007,21 +1005,6 @@ class MeshMonitorPanel extends HTMLElement {
     this.shadowRoot
       .querySelector("#node-detail-map")
       ?.addEventListener("click", () => this._mapNodeFromDetail());
-    this.shadowRoot
-      .querySelector("#node-detail-remove")
-      ?.addEventListener("click", () => {
-        this._nodeRemovalReview = true;
-        this._render();
-      });
-    this.shadowRoot
-      .querySelector("#confirm-node-removal")
-      ?.addEventListener("click", () => this._removeNodeFromDetail());
-    this.shadowRoot
-      .querySelector("#cancel-node-removal")
-      ?.addEventListener("click", () => {
-        this._nodeRemovalReview = false;
-        this._render();
-      });
     this.shadowRoot
       .querySelector(".node-detail")
       ?.addEventListener("keydown", (event) => this._nodeDetailKeydown(event));
@@ -1255,6 +1238,13 @@ class MeshMonitorPanel extends HTMLElement {
           button.dataset.source,
           button.dataset.positionNode,
           button.dataset.nodeName,
+        );
+      const detailButton = event.target.closest?.("[data-map-node-detail]");
+      if (detailButton)
+        this._nodeDetailFromMap(
+          detailButton.dataset.entry,
+          detailButton.dataset.source,
+          detailButton.dataset.mapNodeDetail,
         );
     });
     if (this._tab === "map")
@@ -1768,15 +1758,20 @@ class MeshMonitorPanel extends HTMLElement {
       const link = node.device_id
         ? `<p><a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open Home Assistant device</a></p>`
         : "";
-      const meshmonitorLink = node.meshmonitor_url
-        ? `<p><a href="${escapeHtml(node.meshmonitor_url)}" target="_blank" rel="noopener noreferrer">Open source nodes in MeshMonitor ↗</a></p>`
+      const nodeDetail = this._allNodes().some(
+        (item) =>
+          item.entry_id === node.entry_id &&
+          item.source_id === node.source_id &&
+          item.id === node.id,
+      )
+        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button></p>`
         : "";
       const trail = node.protocol === "meshtastic"
         ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button></p>`
         : "";
       const activity = nodeActivity(node);
       marker.bindPopup(
-        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${meshmonitorLink}`,
+        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${nodeDetail}`,
       );
       if (
         this._mapFocusNode ===
@@ -2091,20 +2086,14 @@ class MeshMonitorPanel extends HTMLElement {
       presentation.actions.ignore
         ? `<button id="node-detail-ignore" class="warning" ${requestPending ? "disabled" : ""}><ha-icon icon="mdi:${node.ignored ? "eye-outline" : "eye-off-outline"}" aria-hidden="true"></ha-icon>${node.ignored ? "Unignore node" : "Ignore node"}</button>`
         : "",
-      presentation.actions.remove
-        ? `<button id="node-detail-remove" class="danger" ${presentation.actions.removeEnabled ? "" : "disabled"} title="${presentation.actions.removeEnabled ? "Remove this node and its stored MeshMonitor history" : "Enable node removal in this source's integration options"}"><ha-icon icon="mdi:delete-outline" aria-hidden="true"></ha-icon>Remove from MeshMonitor</button>`
-        : "",
     ].filter(Boolean).join("");
     const history = presentation.monitored
       ? `<section class="node-history" aria-label="Monitored source diagnostics"><div class="node-history-head"><div><div class="section-eyebrow">Monitored source diagnostics</div><h3>Telemetry and link quality</h3></div><div class="node-history-controls"><select id="node-history-range" aria-label="Node history time range">${[[1,"1 hour"],[6,"6 hours"],[24,"24 hours"],[72,"3 days"],[168,"7 days"]].map(([value,label]) => `<option value="${value}" ${this._nodeHistoryHours === value ? "selected" : ""}>${label}</option>`).join("")}</select><button id="load-node-history" ${this._nodeHistoryLoading ? "disabled" : ""}>${this._nodeHistory ? "Refresh" : "Load history"}</button></div></div><p class="node-history-note muted">Stored diagnostics for this directly monitored source node.${escapeHtml(truncation)}</p>${historyBody}</section>`
       : "";
-    const removalReview = this._nodeRemovalReview
-      ? `<section class="node-detail-group" role="alertdialog" aria-label="Confirm node removal"><h3>Remove ${escapeHtml(node.name)}?</h3><p>This removes the local MeshMonitor node record and its stored messages, traceroutes, and telemetry.</p><dl class="node-detail-meta"><div><dt>Protocol</dt><dd>Meshtastic</dd></div><div><dt>Source</dt><dd>${escapeHtml(source?.name || node.source_id)}</dd></div><div><dt>Node ID</dt><dd>${escapeHtml(node.id)}</dd></div><div><dt>${escapeHtml(time.activityLabel)}</dt><dd>${escapeHtml(time.label)}</dd></div></dl><p class="muted">It does not purge the node from the radio.</p><div class="node-detail-actions"><button id="cancel-node-removal">Cancel</button><button id="confirm-node-removal" class="danger">Remove node</button></div></section>`
-      : "";
     const ignoreReview = this._nodeIgnoreReview
       ? `<section class="node-detail-group" role="alertdialog" aria-label="Confirm ignore change"><h3>${node.ignored ? "Unignore" : "Ignore"} ${escapeHtml(node.name)}?</h3><p>This changes MeshMonitor's server-only ignore state.</p><p class="muted">It does not sync the change to the radio.</p><div class="node-detail-actions"><button id="cancel-node-ignore">Cancel</button><button id="confirm-node-ignore" class="danger">${node.ignored ? "Unignore node" : "Ignore node"}</button></div></section>`
       : "";
-    return `<div class="node-detail-scrim"><section class="node-detail" role="dialog" aria-modal="true" aria-labelledby="node-detail-title" tabindex="-1"><div class="node-detail-head"><div><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span><div class="node-detail-title-row"><h2 id="node-detail-title">${escapeHtml(node.name)}</h2>${presentation.actions.favorite ? `<button class="node-detail-favorite" data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-favorite-node="${escapeHtml(node.id)}" data-favorite="${node.favorite}" aria-label="${node.favorite ? "Remove from favorites" : "Add to favorites"}" ${favoritePending ? "disabled" : ""}>${node.favorite ? "★" : "☆"}</button>` : ""}</div><p class="muted">${escapeHtml(node.id)} · ${escapeHtml(source?.name || node.source_id)}</p></div><button id="close-node-detail" class="node-detail-close" aria-label="Close node details">×</button></div><div class="node-detail-body"><div class="node-detail-summary"><div class="node-detail-stat"><span>${escapeHtml(time.activityLabel)}</span><strong class="last-heard ${time.state}" title="${escapeHtml(time.title)}">${escapeHtml(time.label)}</strong></div><div class="node-detail-stat power-stat"><span>Power</span><strong>${nodeDetailBatteryMarkup(node.battery, node.voltage)}</strong></div><div class="node-detail-stat"><span>RSSI</span><strong>${escapeHtml(presentation.signal.rssi || "Not reported")}</strong></div><div class="node-detail-stat"><span>SNR</span><strong>${escapeHtml(presentation.signal.snr || "Not reported")}</strong></div></div><div class="node-detail-groups">${groups}</div>${actions ? `<div class="node-detail-actions">${actions}</div>` : ""}${ignoreReview}${removalReview}${this._nodeActionStatus ? `<p class="node-detail-position-note" role="status">${escapeHtml(this._nodeActionStatus)}</p>` : ""}${history}</div></section></div>`;
+    return `<div class="node-detail-scrim"><section class="node-detail" role="dialog" aria-modal="true" aria-labelledby="node-detail-title" tabindex="-1"><div class="node-detail-head"><div><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span><div class="node-detail-title-row"><h2 id="node-detail-title">${escapeHtml(node.name)}</h2>${presentation.actions.favorite ? `<button class="node-detail-favorite" data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-favorite-node="${escapeHtml(node.id)}" data-favorite="${node.favorite}" aria-label="${node.favorite ? "Remove from favorites" : "Add to favorites"}" ${favoritePending ? "disabled" : ""}>${node.favorite ? "★" : "☆"}</button>` : ""}</div><p class="muted">${escapeHtml(node.id)} · ${escapeHtml(source?.name || node.source_id)}</p></div><button id="close-node-detail" class="node-detail-close" aria-label="Close node details">×</button></div><div class="node-detail-body"><div class="node-detail-summary"><div class="node-detail-stat"><span>${escapeHtml(time.activityLabel)}</span><strong class="last-heard ${time.state}" title="${escapeHtml(time.title)}">${escapeHtml(time.label)}</strong></div><div class="node-detail-stat power-stat"><span>Power</span><strong>${nodeDetailBatteryMarkup(node.battery, node.voltage)}</strong></div><div class="node-detail-stat"><span>RSSI</span><strong>${escapeHtml(presentation.signal.rssi || "Not reported")}</strong></div><div class="node-detail-stat"><span>SNR</span><strong>${escapeHtml(presentation.signal.snr || "Not reported")}</strong></div></div><div class="node-detail-groups">${groups}</div>${actions ? `<div class="node-detail-actions">${actions}</div>` : ""}${ignoreReview}${this._nodeActionStatus ? `<p class="node-detail-position-note" role="status">${escapeHtml(this._nodeActionStatus)}</p>` : ""}${history}</div></section></div>`;
   }
 
   _openNodeDetail(entryId, sourceId, nodeId) {
@@ -2113,7 +2102,6 @@ class MeshMonitorPanel extends HTMLElement {
     this._nodeActionStatus = "";
     this._nodeActionPending = "";
     this._nodeIgnoreReview = false;
-    this._nodeRemovalReview = false;
     this._nodeHistory = null;
     this._nodeHistoryLoading = false;
     this._nodeHistoryError = "";
@@ -2191,6 +2179,18 @@ class MeshMonitorPanel extends HTMLElement {
     this._render();
   }
 
+  _nodeDetailFromMap(entryId, sourceId, nodeId) {
+    const node = this._allNodes().find(
+      (item) =>
+        item.entry_id === entryId &&
+        item.source_id === sourceId &&
+        item.id === nodeId,
+    );
+    if (!node) return;
+    this._tab = "nodes";
+    this._openNodeDetail(entryId, sourceId, nodeId);
+  }
+
   _nodeDetailKeydown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -2261,7 +2261,7 @@ class MeshMonitorPanel extends HTMLElement {
   _unread(messages) {
     return messages.filter(
       (message) =>
-        messagePresentation(message, this._messageReadAt(message)).outgoing !== true &&
+        messagePresentation(message, this._messageReadAt(message), this._data?.sources || []).outgoing !== true &&
         this._messageTime(message) > this._messageReadAt(message),
     ).length;
   }
@@ -2367,7 +2367,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._render();
       return;
     }
-    const presentation = messagePresentation(message, this._lastRead);
+    const presentation = messagePresentation(message, this._lastRead, this._data?.sources || []);
     this._selectConversation(key, true);
     this._replyContext = {
       sender: presentation.sender,
@@ -2505,7 +2505,7 @@ class MeshMonitorPanel extends HTMLElement {
     this._pendingMessages = this._pendingMessages.filter((pending) => {
       if (pending.state !== "queued") return true;
       return !messages.some((message) =>
-        messagePresentation(message, this._lastRead).outgoing === true &&
+        messagePresentation(message, this._lastRead, this._data?.sources || []).outgoing === true &&
         this._conversationKey(message) === pending.conversationKey &&
         message.text === pending.body &&
         Math.abs(this._messageTime(message) - pending.createdAt) < 300000
@@ -2516,7 +2516,7 @@ class MeshMonitorPanel extends HTMLElement {
       const replyKey = encodeURIComponent(
         JSON.stringify([message.entry_id || "", message.id || ""]),
       );
-      const presentation = messagePresentation(message, this._messageReadAt(message));
+      const presentation = messagePresentation(message, this._messageReadAt(message), this._data?.sources || []);
       const date = new Date(presentation.timestamp);
       const validDate = !Number.isNaN(date.valueOf()) && presentation.timestamp > 0;
       const day = validDate ? date.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}) : "Unknown date";
@@ -2591,37 +2591,6 @@ class MeshMonitorPanel extends HTMLElement {
       this._favoritePending.delete(favoriteKey);
       this._favoriteOverrides.delete(favoriteKey);
       this._error = `Favorite change blocked: ${error?.message || String(error)}`;
-      this._render();
-    }
-  }
-
-  async _removeNodeFromDetail() {
-    const detail = this._nodeDetail;
-    if (!detail) return;
-    const node = this._allNodes().find(
-      (item) => item.entry_id === detail.entry_id && item.source_id === detail.source_id && item.id === detail.node_id,
-    );
-    const source = (this._data?.sources || []).find(
-      (item) => item.entry_id === detail.entry_id && item.source_id === detail.source_id,
-    );
-    if (!node || !source) return;
-    this._nodeRemovalReview = false;
-    this._nodeActionStatus = "Removing node from MeshMonitor…";
-    this._render();
-    try {
-      const result = await this._hass.callWS({
-        type: "meshmonitor/remove_node",
-        entry_id: detail.entry_id,
-        source_id: detail.source_id,
-        node_id: detail.node_id,
-      });
-      this._nodeDetail = null;
-      this._nodeActionStatus = "";
-      await this._load();
-      this._error = `${result.node_name || node.name} removed from MeshMonitor (${result.messages_deleted} messages, ${result.traceroutes_deleted} traceroutes, ${result.telemetry_deleted} telemetry records).`;
-      this._render();
-    } catch (error) {
-      this._nodeActionStatus = `Removal blocked: ${error?.message || String(error)}`;
       this._render();
     }
   }
@@ -2823,7 +2792,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260823-1330")) {
-  customElements.define("meshmonitor-panel-20260823-1330", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260823-1453")) {
+  customElements.define("meshmonitor-panel-20260823-1453", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
