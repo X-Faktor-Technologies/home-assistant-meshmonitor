@@ -1,0 +1,33 @@
+blueprint:
+  name: Home Assistant low battery to mesh
+  description: Send one channel warning when a selected battery entity falls below a threshold.
+  domain: automation
+  author: MeshMonitor
+  input:
+    battery_entity:
+      name: Battery entity
+      selector: {entity: {device_class: battery}}
+    threshold:
+      name: Battery threshold
+      default: 20
+      selector: {number: {min: 1, max: 99, unit_of_measurement: "%"}}
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter: {integration: meshmonitor}
+    channel:
+      name: Channel
+      default: 0
+      selector: {number: {min: 0, max: 255, mode: box}}
+mode: single
+triggers:
+  - trigger: numeric_state
+    entity_id: !input battery_entity
+    below: !input threshold
+actions:
+  - action: meshmonitor.send_channel_message
+    data:
+      source_device_id: !input source_device
+      channel: !input channel
+      text: "Low battery: {{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }} is {{ trigger.to_state.state }}%."

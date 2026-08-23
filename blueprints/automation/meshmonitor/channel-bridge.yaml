@@ -1,0 +1,48 @@
+blueprint:
+  name: MeshMonitor safe channel bridge
+  description: Forward one incoming channel into another source/channel with a loop marker. Message text is retained in automation traces.
+  domain: automation
+  author: MeshMonitor
+  input:
+    incoming_source:
+      name: Incoming source
+      selector:
+        device:
+          filter: {integration: meshmonitor}
+    incoming_channel:
+      name: Incoming channel
+      default: 0
+      selector: {number: {min: 0, max: 255, mode: box}}
+    outgoing_source:
+      name: Outgoing source
+      selector:
+        device:
+          filter: {integration: meshmonitor}
+    outgoing_channel:
+      name: Outgoing channel
+      default: 0
+      selector: {number: {min: 0, max: 255, mode: box}}
+    marker:
+      name: Loop-prevention marker
+      default: "[HA bridge]"
+      selector: {text: {}}
+mode: queued
+max: 3
+triggers:
+  - trigger: device
+    device_id: !input incoming_source
+    domain: meshmonitor
+    type: channel_message_received
+    channel: !input incoming_channel
+    text_required: true
+variables:
+  bridge_marker: !input marker
+conditions:
+  - condition: template
+    value_template: "{{ bridge_marker not in trigger.event.data.text }}"
+actions:
+  - action: meshmonitor.send_channel_message
+    data:
+      source_device_id: !input outgoing_source
+      channel: !input outgoing_channel
+      text: "{{ bridge_marker }} {{ trigger.event.data.sender_name or trigger.event.data.sender_id }}: {{ trigger.event.data.text }}"

@@ -1,0 +1,38 @@
+blueprint:
+  name: MeshMonitor range-test responder
+  description: Reply to an exact DM command with available hop, RSSI, SNR, and MQTT metadata. Message text is retained in automation traces.
+  domain: automation
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Meshtastic source
+      selector:
+        device:
+          filter: {integration: meshmonitor, model: Meshtastic source}
+    command:
+      name: Exact range-test command
+      default: range
+      selector: {text: {}}
+mode: queued
+max: 3
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: direct_message_received
+    text_required: true
+variables:
+  expected_command: !input command
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.text | trim == expected_command | trim }}"
+actions:
+  - action: meshmonitor.send_direct_message
+    data:
+      source_device_id: !input source_device
+      recipient: "{{ trigger.event.data.sender_id }}"
+      text: >-
+        hops={{ trigger.event.data.hop_count | default('unknown') }}
+        rssi={{ trigger.event.data.rssi | default('unknown') }}
+        snr={{ trigger.event.data.snr | default('unknown') }}
+        mqtt={{ trigger.event.data.via_mqtt | default('unknown') }}

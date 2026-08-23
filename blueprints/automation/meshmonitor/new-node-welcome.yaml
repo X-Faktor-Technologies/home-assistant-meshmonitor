@@ -1,0 +1,28 @@
+blueprint:
+  name: MeshMonitor new-node welcome
+  description: Send one direct welcome when a new node is discovered. Outbound guards apply.
+  domain: automation
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter: {integration: meshmonitor, model: Meshtastic source}
+    message:
+      name: Welcome message
+      default: Welcome to the mesh.
+      selector: {text: {multiline: true}}
+mode: queued
+max: 3
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: node_discovered
+actions:
+  - action: meshmonitor.send_direct_message
+    data:
+      source_device_id: !input source_device
+      recipient: "{{ trigger.event.data.node_id }}"
+      text: !input message

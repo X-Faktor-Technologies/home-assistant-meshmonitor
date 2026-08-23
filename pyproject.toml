@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "home-assistant-meshmonitor"
+version = "0.16.0"
+description = "MeshMonitor integration for Meshtastic, MeshCore, and Reticulum in Home Assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "mypy>=1.17",
+  "pytest-homeassistant-custom-component>=0.13.205",
+  "ruff>=0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["custom_components/meshmonitor"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["custom_components.meshmonitor"]

@@ -1,0 +1,34 @@
+blueprint:
+  name: Home Assistant zone exit to mesh
+  description: Announce when a positioned node or tracker leaves a selected zone.
+  domain: automation
+  author: MeshMonitor
+  input:
+    tracker:
+      name: Tracker
+      selector: {entity: {domain: device_tracker}}
+    zone:
+      name: Zone
+      selector: {entity: {domain: zone}}
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter: {integration: meshmonitor}
+    channel:
+      name: Channel
+      default: 0
+      selector: {number: {min: 0, max: 255, mode: box}}
+mode: queued
+max: 3
+triggers:
+  - trigger: zone
+    entity_id: !input tracker
+    zone: !input zone
+    event: leave
+actions:
+  - action: meshmonitor.send_channel_message
+    data:
+      source_device_id: !input source_device
+      channel: !input channel
+      text: "{{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }} left {{ state_attr(trigger.zone_id, 'friendly_name') or trigger.zone_id }}."

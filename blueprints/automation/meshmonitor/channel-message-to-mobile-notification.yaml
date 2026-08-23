@@ -1,0 +1,65 @@
+blueprint:
+  name: MeshMonitor channel message to mobile notification
+  description: >-
+    Send an incoming message from one selected mesh channel to a Home Assistant
+    Companion App device. The selected source must have message polling and
+    Expose message text in events enabled. Message text and sender metadata will
+    be retained in automation traces and sent through the mobile notification
+    service; use this only where that privacy tradeoff is acceptable.
+  domain: automation
+  source_url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/blob/main/blueprints/automation/meshmonitor/channel-message-to-mobile-notification.yaml
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+    channel:
+      name: Channel number
+      description: Only incoming messages from this channel index will match.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box
+    notify_device:
+      name: Device to notify
+      description: A device running the official Home Assistant Companion App.
+      selector:
+        device:
+          filter:
+            integration: mobile_app
+
+mode: queued
+max: 10
+
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: channel_message_received
+    channel: !input channel
+    text_required: true
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.text is defined
+         and trigger.event.data.text | trim | length > 0 }}
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: >-
+      Mesh message{% if trigger.event.data.channel_name %}
+      — {{ trigger.event.data.channel_name }}{% endif %}
+    message: >-
+      {% if trigger.event.data.sender_name %}
+      {{ trigger.event.data.sender_name }}: {% endif %}{{ trigger.event.data.text }}

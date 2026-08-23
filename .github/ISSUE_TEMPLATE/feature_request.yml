@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose a bounded API-backed daily mesh-console capability
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Home Assistant is the daily mesh console; MeshMonitor owns technical administration. Requests need a clear operator use case and documented or verified API support. Generic API passthroughs are out of scope.
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Daily operator use case
+      description: What should an operator be able to see or do in Home Assistant, and why is it useful there?
+    validations:
+      required: true
+  - type: textarea
+    id: api_contract
+    attributes:
+      label: MeshMonitor API evidence
+      description: Name the documented or read-only-verified route, response contract, and required permission. Do not paste a raw response.
+    validations:
+      required: true
+  - type: dropdown
+    id: effect
+    attributes:
+      label: Operation class
+      options:
+        - Stored-data read only
+        - Server-side metadata write
+        - Radio-transmitting or active operation
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy, retention, and request-rate impact
+      description: Identify sensitive data, where it would appear or persist, and expected API frequency.
+    validations:
+      required: true
+  - type: textarea
+    id: alternative
+    attributes:
+      label: Alternatives considered
+      description: Explain why a MeshMonitor link, dashboard, or automation using existing entities is insufficient.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Product-boundary confirmation
+      options:
+        - label: This proposal does not add a generic API passthrough or duplicate MeshMonitor technical administration.
+          required: true
+        - label: I did not probe a system, broaden permissions, transmit, or mutate configuration without explicit owner authorization.
+          required: true
+        - label: I removed credentials, identities, locations, message content, private addresses, and raw responses.
+          required: true

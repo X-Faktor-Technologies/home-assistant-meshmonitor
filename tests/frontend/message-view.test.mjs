@@ -1,0 +1,279 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+import {
+  conversationSourceChoices,
+  messageByteLimit,
+  messageConversationCatalog,
+  messageConversationKey,
+  messageDirectPeerId,
+  messageDraftValidation,
+  messagePresentation,
+  messageSendNonce,
+  messageTimestampMs,
+  messagesInConversation,
+  sendErrorPresentation,
+} from "../../custom_components/meshmonitor/frontend/message-view.js";
+
+const SOURCE = {
+  entry_id: "entry-1",
+  source_id: "source-1",
+  protocol: "meshtastic",
+  name: "Synthetic Meshtastic",
+  available: true,
+  connected: true,
+  fetched_at: "2026-08-17T19:00:00Z",
+  stale_after_seconds: 300,
+  transmit_enabled: true,
+  channels: [{ index: 0, name: "Primary" }],
+  nodes: [{ id: "!0000002a", name: "Synthetic node" }],
+};
+
+const HISTORY = Array.from({ length: 7 }, (_, index) => ({
+  id: `mt:sender:p${1000 + index}`,
+  protocol: "meshtastic",
+  from_id: "sender",
+  from_name: "Synthetic sender",
+  channel: 0,
+  channel_name: "Primary",
+  text: `synthetic-${index}`,
+  created_at: 1_770_000_000_000 + index,
+  receptions: [{ source_id: "source-1" }],
+}));
+
+test("Primary and All messages contain the discovered stored history fixture", () => {
+  const catalog = messageConversationCatalog(HISTORY, [SOURCE]);
+  const primary = catalog.find((item) => item.name === "Primary");
+
+  assert.equal(primary.key, "channel:meshtastic:0");
+  assert.equal(messagesInConversation(HISTORY, primary.key).length, 7);
+  assert.equal(messagesInConversation(HISTORY, "all").length, 7);
+  assert.equal(messageConversationKey(HISTORY[0]), primary.key);
+});
+
+test("empty stored history keeps an honest channel destination", () => {
+  const catalog = messageConversationCatalog([], [SOURCE]);
+
+  assert.equal(catalog.length, 1);
+  assert.equal(catalog[0].name, "Primary");
+  assert.deepEqual(messagesInConversation([], catalog[0].key), []);
+});
+
+test("protocol names keep MeshCore and Meshtastic channels separate", () => {
+  const meshcore = {
+    ...HISTORY[0],
+    id: "mc:source-2:9",
+    protocol: "meshcore",
+  };
+
+  assert.notEqual(messageConversationKey(meshcore), messageConversationKey(HISTORY[0]));
+  assert.deepEqual(
+    messagesInConversation([HISTORY[0], meshcore], "channel:meshcore:0").map(
+      (message) => message.id,
+    ),
+    ["mc:source-2:9"],
+  );
+});
+
+test("direct identity uses the stable remote node in both directions", () => {
+  const incoming = {
+    protocol: "meshtastic",
+    channel: null,
+    from_id: "!0000002a",
+    to_id: "!00000001",
+  };
+  const outgoing = { ...incoming, outgoing: true, from_id: "!00000001", to_id: "!0000002a" };
+
+  assert.equal(messageDirectPeerId(incoming), "!0000002a");
+  assert.equal(messageDirectPeerId(outgoing), "!0000002a");
+  assert.equal(messageConversationKey(incoming), "direct:meshtastic:!0000002a");
+  assert.equal(messageConversationKey(outgoing), "direct:meshtastic:!0000002a");
+});
+
+test("source choices are exact, explicit, fresh, and destination compatible", () => {
+  const now = Date.parse("2026-08-17T19:02:00Z");
+  const conversation = messageConversationCatalog(HISTORY, [SOURCE])[0];
+  const second = { ...SOURCE, entry_id: "entry-2", source_id: "source-2", name: "Second" };
+  const wrongChannel = { ...SOURCE, source_id: "wrong-channel", channels: [{ index: 1, name: "Secondary" }] };
+  const stale = { ...SOURCE, source_id: "stale", fetched_at: "2026-08-17T18:00:00Z" };
+  const disabled = { ...SOURCE, source_id: "disabled", transmit_enabled: false };
+
+  const choices = conversationSourceChoices(
+    conversation,
+    [SOURCE, second, wrongChannel, stale, disabled],
+    now,
+  );
+
+  assert.deepEqual(choices.map((choice) => choice.source.source_id), ["source-1", "source-2", "stale", "disabled"]);
+  assert.deepEqual(choices.map((choice) => choice.enabled), [true, true, false, false]);
+  assert.match(choices[2].reason, /stale/);
+  assert.match(choices[3].reason, /option is off/);
+});
+
+test("unknown direct targets and unsupported protocols stay non-sendable", () => {
+  const unknown = { key: "direct:meshtastic:unknown", type: "direct", protocol: "meshtastic", recipient: "unknown" };
+  const unsupported = { key: "channel:meshcore:0", type: "channel", protocol: "meshcore", channel: 0 };
+
+  assert.deepEqual(conversationSourceChoices(unknown, [SOURCE]), []);
+  assert.deepEqual(conversationSourceChoices(unsupported, [SOURCE]), []);
+});
+
+test("UTF-8 limits use encoded bytes at exact protocol boundaries", () => {
+  assert.equal(messageByteLimit("meshtastic", "direct"), 200);
+  assert.equal(messageByteLimit("meshcore", "channel"), 130);
+  assert.equal(messageByteLimit("meshcore", "direct"), 150);
+  assert.equal(messageDraftValidation("é".repeat(75), "meshcore", "direct").valid, true);
+  assert.equal(messageDraftValidation("é".repeat(76), "meshcore", "direct").valid, false);
+  assert.equal(messageDraftValidation("\n", "meshtastic", "channel").valid, false);
+  assert.equal(messageDraftValidation("broken\ud800", "meshtastic", "channel").valid, false);
+});
+
+test("send errors distinguish deterministic blocks from ambiguous outcomes", () => {
+  assert.equal(sendErrorPresentation({ code: "permission_denied" }).ambiguous, false);
+  assert.match(sendErrorPresentation({ code: "rate_limited" }).message, /Wait/);
+  assert.equal(sendErrorPresentation({ code: "cannot_connect" }).ambiguous, true);
+  assert.match(sendErrorPresentation({}).message, /no automatic retry/);
+});
+
+test("send nonce works on HTTP origins without crypto.randomUUID", () => {
+  const cryptoWithoutUuid = {
+    getRandomValues(bytes) {
+      bytes.forEach((_, index) => { bytes[index] = index; });
+      return bytes;
+    },
+  };
+
+  assert.equal(
+    messageSendNonce(cryptoWithoutUuid),
+    "000102030405060708090a0b0c0d0e0f",
+  );
+  assert.equal(messageSendNonce(cryptoWithoutUuid).length, 32);
+});
+
+test("radio-backed sends use HA's supported queued WebSocket command", () => {
+  const panel = readFileSync(
+    new URL(
+      "../../custom_components/meshmonitor/frontend/meshmonitor-panel.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(panel, /const result = await this\._hass\.callWS\(request\)/);
+  assert.match(panel, /id: messageSendNonce\(\)/);
+  assert.match(panel, /nonce: pending\.id/);
+  assert.doesNotMatch(panel, /crypto\.randomUUID/);
+  assert.doesNotMatch(panel, /connection\.sendMessagePromise/);
+  assert.match(panel, /pending\.state = "queued"/);
+});
+
+test("timeline presentation keeps provenance compact and deterministic", () => {
+  const presentation = messagePresentation(
+    {
+      ...HISTORY[0],
+      receptions: [
+        { source_id: "source-1", source_name: "North relay" },
+        { source_id: "source-2", source_name: "South relay" },
+        { source_id: "source-1", source_name: "North relay" },
+      ],
+    },
+    HISTORY[0].created_at - 1,
+  );
+
+  assert.equal(presentation.sender, "Synthetic sender");
+  assert.equal(presentation.sourceSummary, "Via 2 sources");
+  assert.deepEqual(presentation.sourceNames, ["North relay", "South relay"]);
+  assert.equal(presentation.unread, true);
+  assert.equal(presentation.outgoing, false);
+});
+
+test("unknown, reaction, outbound, and timestamp fallbacks stay honest", () => {
+  assert.equal(messageTimestampMs({ created_at: 1_800_000_000 }), 1_800_000_000_000);
+  assert.equal(messageTimestampMs({ timestamp: "not-a-date" }), 0);
+  assert.deepEqual(
+    messagePresentation({ outgoing: true, text: "sent", receptions: [] }),
+    {
+      body: "sent",
+      deliveryState: "",
+      outgoing: true,
+      protocol: "unknown",
+      sender: "You",
+      sourceNames: [],
+      sourceSummary: "Source unavailable",
+      timestamp: 0,
+      unread: false,
+    },
+  );
+  assert.equal(messagePresentation({ emoji: "👍" }).body, "Reaction 👍");
+  assert.equal(messagePresentation({}).sender, "Unknown sender");
+});
+
+test("outbound history never becomes unread", () => {
+  const presentation = messagePresentation(
+    { outgoing: true, text: "sent", created_at: 1_800_000_000_000, receptions: [] },
+    1_700_000_000_000,
+  );
+
+  assert.equal(presentation.outgoing, true);
+  assert.equal(presentation.unread, false);
+});
+
+test("Messages includes persistent backend notification controls", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /id="notification-bell"/);
+  assert.match(panel, /class="tab-bar"/);
+  assert.match(panel, /_notificationBell\(\)/);
+  assert.match(panel, /Message notifications disabled/);
+  assert.match(panel, /\.notification-bell svg \{[^}]+fill:none/);
+  assert.match(panel, /\.notification-bell\.enabled svg \{ fill:currentColor; stroke:none/);
+  assert.match(panel, /\.notification-bell \{[^}]+border:0[^}]+background:transparent[^}]+box-shadow:none/);
+  assert.match(panel, /meshmonitor\/notification_settings/);
+  assert.match(panel, /meshmonitor\/update_notification_settings/);
+  assert.match(panel, /All incoming messages/);
+  assert.match(panel, /Channel messages only/);
+  assert.match(panel, /Direct messages only/);
+  assert.match(panel, /History, sent messages, and replays are excluded/);
+  assert.match(panel, /No notification targets found/);
+  assert.match(panel, /target\.entity_id/);
+  assert.match(panel, /<select id="notification-target">/);
+  assert.doesNotMatch(panel, /name="notification-target"/);
+  assert.match(panel, /notificationDeepLink\(window\.location\.search\)/);
+  assert.match(panel, /set route\(value\)/);
+  assert.match(panel, /window\.addEventListener\("location-changed"/);
+  assert.match(panel, /_applyNotificationDeepLink\(\)/);
+  assert.match(panel, /this\._tab = "messages"/);
+  assert.match(panel, /data-message-id=/);
+  assert.match(panel, /_restoreNotificationDeepLink\(\)/);
+  assert.match(panel, /nav::-webkit-scrollbar \{ display:none/);
+});
+
+test("conversation DOM keeps a visible focusable scroll region and calm cards", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /overflow-y:scroll/);
+  assert.match(panel, /scrollbar-width:auto/);
+  assert.match(panel, /scrollbar-gutter:stable/);
+  assert.match(panel, /class="messages"[^>]+role="log"[^>]+tabindex="0"/);
+  assert.match(panel, /_messageScrollByConversation/);
+  assert.match(panel, /id="compose-send"/);
+  assert.match(panel, /this\._sending \? "Sending…" : "Send"/);
+  assert.match(panel, /data-reply-message/);
+  assert.match(panel, /this\._composeText = ""/);
+  assert.match(panel, /this\._messageDrafts\.delete\(this\._conversation\)/);
+  assert.match(panel, /class="message outgoing pending"/);
+  assert.match(panel, /border-bottom-left-radius:0/);
+  assert.match(panel, /border-bottom-right-radius:0/);
+  assert.match(panel, /main\.messages-view \{[^}]*overflow:hidden/);
+  assert.match(panel, /#compose-send \{[^}]*background:var\(--primary-color\)/);
+  assert.doesNotMatch(panel, /\.conversation-item \{[^}]*border-bottom:/);
+  assert.doesNotMatch(panel, /window\.confirm/);
+  assert.doesNotMatch(panel, /Review outbound message/);
+  assert.doesNotMatch(panel, /\.message \{[^}]*border-left:4px/);
+});

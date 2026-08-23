@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and troubleshooting
+    url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/blob/main/SUPPORT.md
+    about: Read the supported scope, safe evidence rules, and troubleshooting routes.
+  - name: Report a security vulnerability privately
+    url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/security/advisories/new
+    about: Do not disclose vulnerabilities or sensitive operational data in a public issue.

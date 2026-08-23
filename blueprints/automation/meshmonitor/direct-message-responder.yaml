@@ -1,0 +1,38 @@
+blueprint:
+  name: MeshMonitor direct-message responder
+  description: Match one incoming DM command and send one bounded reply. Message text is retained in automation traces.
+  domain: automation
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter: {integration: meshmonitor, model: Meshtastic source}
+    command:
+      name: Exact command text
+      default: ping
+      selector: {text: {}}
+    response:
+      name: Reply text
+      default: pong
+      selector: {template: {}}
+mode: queued
+max: 3
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: direct_message_received
+    text_required: true
+variables:
+  expected_command: !input command
+conditions:
+  - condition: template
+    value_template: "{{ trigger.event.data.text | trim == expected_command | trim }}"
+actions:
+  - action: meshmonitor.send_direct_message
+    data:
+      source_device_id: !input source_device
+      recipient: "{{ trigger.event.data.sender_id }}"
+      text: !input response

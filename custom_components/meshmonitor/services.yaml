@@ -1,0 +1,76 @@
+send_direct_message:
+  fields:
+    source_device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+          multiple: false
+    destination_device_id:
+      required: false
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              manufacturer: Meshtastic
+            - integration: meshmonitor
+              manufacturer: MeshCore
+          multiple: false
+    recipient:
+      required: false
+      selector:
+        text:
+          multiline: false
+    text:
+      required: true
+      selector:
+        text:
+          multiline: true
+    reply_id:
+      required: false
+      example: 3726281140
+      selector:
+        number:
+          min: 0
+          max: 4294967295
+          mode: box
+
+send_channel_message:
+  fields:
+    source_device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+          multiple: false
+    channel:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box
+    text:
+      required: true
+      selector:
+        text:
+          multiline: true
+
+send_advert:
+  fields:
+    source_device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: MeshCore source
+          multiple: false

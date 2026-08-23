@@ -1,0 +1,58 @@
+blueprint:
+  name: MeshMonitor direct message to TTS
+  description: >-
+    Speak the text from an incoming direct mesh message. The selected source
+    must have message polling and Expose message text in events enabled.
+    Message text will be copied into Home Assistant automation traces and sent
+    to the selected TTS provider and media player; use this only where that
+    privacy tradeoff is acceptable.
+  domain: automation
+  source_url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/blob/main/blueprints/automation/meshmonitor/direct-message-to-tts.yaml
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Mesh source
+      description: The Meshtastic or MeshCore source that receives the message.
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+    tts_entity:
+      name: Text-to-speech provider
+      selector:
+        entity:
+          filter:
+            domain: tts
+    media_player:
+      name: Media player
+      selector:
+        entity:
+          filter:
+            domain: media_player
+
+mode: queued
+max: 5
+
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: direct_message_received
+    text_required: true
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.event.data.text is defined
+         and trigger.event.data.text | trim | length > 0 }}
+
+actions:
+  - action: tts.speak
+    target:
+      entity_id: !input tts_entity
+    data:
+      media_player_entity_id: !input media_player
+      message: "{{ trigger.event.data.text }}"

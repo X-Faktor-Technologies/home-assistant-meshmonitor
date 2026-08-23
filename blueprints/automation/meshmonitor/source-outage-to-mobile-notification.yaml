@@ -1,0 +1,51 @@
+blueprint:
+  name: MeshMonitor source outage notification
+  description: >-
+    Notify a Home Assistant Companion App device when one mesh source remains
+    disconnected for the selected duration. Reconnecting before the duration
+    expires cancels the pending trigger.
+  domain: automation
+  source_url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/blob/main/blueprints/automation/meshmonitor/source-outage-to-mobile-notification.yaml
+  author: MeshMonitor
+  input:
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+    outage_duration:
+      name: Disconnected for
+      description: The source must remain disconnected for this entire period.
+      default:
+        hours: 0
+        minutes: 2
+        seconds: 0
+      selector:
+        duration:
+          enable_day: true
+    notify_device:
+      name: Device to notify
+      selector:
+        device:
+          filter:
+            integration: mobile_app
+
+mode: single
+
+triggers:
+  - trigger: device
+    device_id: !input source_device
+    domain: meshmonitor
+    type: source_disconnected
+    for: !input outage_duration
+
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: Mesh source unavailable
+    message: A configured MeshMonitor source remains disconnected.

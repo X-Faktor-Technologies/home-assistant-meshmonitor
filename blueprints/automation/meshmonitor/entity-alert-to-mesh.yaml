@@ -1,0 +1,102 @@
+blueprint:
+  name: Home Assistant entity alert to mesh
+  description: >-
+    Send one direct or channel mesh message when an entity enters a selected
+    state. Outbound messaging must already be enabled for the selected source.
+    MeshMonitor permissions, per-source validation, shared rate limits, and
+    replay protection still apply. A failed or ambiguous send is not retried.
+  domain: automation
+  source_url: https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/blob/main/blueprints/automation/meshmonitor/entity-alert-to-mesh.yaml
+  author: MeshMonitor
+  input:
+    monitored_entity:
+      name: Entity to monitor
+      selector:
+        entity:
+    target_state:
+      name: Trigger state
+      description: Run when the entity changes to this exact state.
+      default: "on"
+      selector:
+        text:
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter:
+            - integration: meshmonitor
+              model: Meshtastic source
+            - integration: meshmonitor
+              model: MeshCore source
+    delivery:
+      name: Delivery method
+      default: direct
+      selector:
+        select:
+          options:
+            - label: Direct message
+              value: direct
+            - label: Channel message
+              value: channel
+          mode: dropdown
+    recipient:
+      name: Direct recipient
+      description: >-
+        Exact node name or protocol-native ID. Used only for direct delivery.
+      default: ""
+      selector:
+        text:
+    channel:
+      name: Channel number
+      description: Used only for channel delivery.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box
+    message:
+      name: Message
+      description: >-
+        Template rendered when the entity reaches the trigger state. The
+        default includes its friendly name and new state.
+      default: >-
+        {{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }}
+        is {{ trigger.to_state.state }}
+      selector:
+        template:
+
+mode: queued
+max: 3
+
+triggers:
+  - trigger: state
+    entity_id: !input monitored_entity
+    to: !input target_state
+
+variables:
+  delivery_method: !input delivery
+  direct_recipient: !input recipient
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ delivery_method == 'channel'
+         or direct_recipient | trim | length > 0 }}
+
+actions:
+  - choose:
+      - conditions: "{{ delivery_method == 'direct' }}"
+        sequence:
+          - action: meshmonitor.send_direct_message
+            data:
+              source_device_id: !input source_device
+              recipient: !input recipient
+              text: !input message
+      - conditions: "{{ delivery_method == 'channel' }}"
+        sequence:
+          - action: meshmonitor.send_channel_message
+            data:
+              source_device_id: !input source_device
+              channel: !input channel
+              text: !input message

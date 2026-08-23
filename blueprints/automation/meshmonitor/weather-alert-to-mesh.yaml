@@ -1,0 +1,34 @@
+blueprint:
+  name: Home Assistant weather alert to mesh
+  description: Broadcast one selected weather-alert entity state change to a mesh channel.
+  domain: automation
+  author: MeshMonitor
+  input:
+    alert_entity:
+      name: Weather alert entity
+      selector: {entity: {}}
+    active_state:
+      name: Active state
+      default: "on"
+      selector: {text: {}}
+    source_device:
+      name: Mesh source
+      selector:
+        device:
+          filter: {integration: meshmonitor}
+    channel:
+      name: Channel
+      default: 0
+      selector: {number: {min: 0, max: 255, mode: box}}
+mode: queued
+max: 3
+triggers:
+  - trigger: state
+    entity_id: !input alert_entity
+    to: !input active_state
+actions:
+  - action: meshmonitor.send_channel_message
+    data:
+      source_device_id: !input source_device
+      channel: !input channel
+      text: "Weather alert: {{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }} is {{ trigger.to_state.state }}."

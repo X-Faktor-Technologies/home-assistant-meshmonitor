@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible defect in MeshMonitor for Home Assistant
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read SUPPORT.md and the troubleshooting guide first. Do not include tokens, message content, real identities, coordinates, private addresses, raw responses, or unreviewed diagnostics. Report security issues privately through SECURITY.md.
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "For example: 0.16.0"
+    validations:
+      required: true
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "For example: 2026.8.0"
+    validations:
+      required: true
+  - type: input
+    id: meshmonitor_version
+    attributes:
+      label: MeshMonitor version
+      placeholder: "For example: 4.15.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: Protocol
+      options:
+        - Meshtastic
+        - MeshCore
+        - Reticulum
+        - Multiple protocols
+        - Not protocol-specific
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the expected and actual behavior without private operational data.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include the smallest sequence, relevant integration options, and permission names.
+      placeholder: |
+        1. Configure ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostic results
+      description: Summarize relevant logs or diagnostics after local review; do not paste raw records.
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Safety and privacy confirmation
+      options:
+        - label: I searched existing issues and followed the troubleshooting guide.
+          required: true
+        - label: I removed credentials, message content, identities, locations, private addresses, and raw operational data.
+          required: true
+        - label: Reproducing this issue did not require an unauthorized write, radio/configuration/admin operation, or permission change.
+          required: true

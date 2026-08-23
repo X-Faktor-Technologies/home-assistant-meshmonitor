@@ -1,0 +1,197 @@
+{
+  "title": "MeshMonitor",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to MeshMonitor",
+        "description": "Enter the local MeshMonitor URL and a read-only API token.",
+        "data": {
+          "url": "URL",
+          "token": "API token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect to MeshMonitor",
+        "description": "Enter a replacement read-only API token.",
+        "data": {
+          "token": "API token"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure MeshMonitor",
+        "description": "Update the exact server URL or API token. Leave the token blank to keep the current token. Every visible supported source is validated before the server entry is changed.",
+        "data": {
+          "url": "URL",
+          "token": "New API token (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to MeshMonitor.",
+      "invalid_url": "Enter an HTTP or HTTPS base URL without credentials, a query string, or a fragment.",
+      "invalid_auth": "The API token was rejected.",
+      "insufficient_permissions": "The token cannot read the required source endpoints.",
+      "no_supported_sources": "No visible Meshtastic, MeshCore, or Reticulum source was found.",
+      "node_visibility_required": "The source is visible but its node list is empty. Enable View on map for an allowed channel in MeshMonitor.",
+      "source_not_found": "The configured source does not exist or is not visible at this server.",
+      "unknown": "Unexpected response from MeshMonitor."
+    },
+    "abort": {
+      "already_configured": "This exact MeshMonitor server is already configured.",
+      "cannot_connect": "Unable to validate the selected source.",
+      "invalid_auth": "The API token was rejected.",
+      "insufficient_permissions": "The token cannot read node data for this source.",
+      "node_visibility_required": "A source is visible but its node list is empty. Enable View on map for an allowed channel in MeshMonitor.",
+      "legacy_entry_unsupported": "This pre-v1 source entry cannot be converted safely. Remove it and add the MeshMonitor server again after installing the completed redesign."
+      ,"reauth_successful": "Reauthentication was successful."
+      ,"reconfigure_successful": "MeshMonitor was reconfigured successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MeshMonitor settings",
+        "menu_options": {
+          "server_settings": "Server settings",
+          "source_select": "Source settings",
+          "refresh_source_inventory": "Refresh source inventory"
+        }
+      },
+      "server_settings": {
+      "title": "Server settings",
+      "description": "Configure behavior shared once by this exact MeshMonitor server.",
+      "data": {
+        "enable_sidebar_panel": "Show the MeshMonitor sidebar panel",
+        "enable_automation_visibility": "Read configured automations and recent outcomes (requires global automations:read)",
+        "node_device_policy": "Home Assistant devices (all nodes remain visible in the MeshMonitor panel)",
+        "message_scan_interval": "Shared message polling interval (seconds)"
+      }
+      },
+      "confirm_registry_cleanup": {
+        "title": "Confirm Home Assistant device cleanup",
+        "description": "This narrower policy will remove {devices} node devices and {entities} entities from Home Assistant. All nodes and history remain unchanged in MeshMonitor and visible in the panel.",
+        "data": {
+          "confirm_registry_cleanup": "Remove these Home Assistant devices and entities"
+        }
+      },
+      "source_select": {
+        "title": "Select a source",
+        "data": {"source_id": "Source"}
+      },
+      "source_settings": {
+      "title": "Source settings",
+      "description": "Configure polling, exposure, privacy, and explicit write gates only for the selected source.",
+      "data": {
+        "scan_interval": "Node and telemetry polling interval (seconds)",
+        "enable_device_trackers": "Expose positioned nodes to the Home Assistant map",
+        "enable_message_polling": "Poll message history and enable the Messages view/events",
+        "expose_message_text": "Include message text in Home Assistant events",
+        "enable_favorites": "Allow server-persistent favorites (requires nodes:write; never syncs Meshtastic favorites to the radio)",
+        "enable_transmit": "Enable outbound messages for this source",
+        "enable_node_management": "Allow automation actions to favorite or ignore nodes (server-only; never syncs Meshtastic state to the radio)",
+        "automated_tx_utilization_limit": "Pause automated transmissions at or above channel utilization (%) — 0 disables",
+        "enable_node_removal": "Allow removing remote Meshtastic nodes and stored history from MeshMonitor (requires messages:write)"
+      }
+      },
+      "refresh_source_inventory": {
+        "title": "Refresh source inventory",
+        "description": "Confirm the validated inventory update. New sources: {added}. Recreated sources recognized and replaced: {replaced}. Temporarily absent sources retained: {retained}. Total stored sources: {total}."
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to MeshMonitor.",
+      "invalid_auth": "The API token was rejected.",
+      "insufficient_permissions": "The token cannot read the required source endpoints.",
+      "no_supported_sources": "No visible Meshtastic, MeshCore, or Reticulum source was found.",
+      "node_visibility_required": "A source is visible but its node list is empty. Enable View on map for an allowed channel in MeshMonitor.",
+      "unknown": "Unexpected response from MeshMonitor.",
+      "registry_cleanup_confirmation_required": "Confirm the Home Assistant registry cleanup to continue."
+    },
+    "abort": {
+      "legacy_entry_unsupported": "This pre-v1 source entry cannot be configured. Remove it and add the MeshMonitor server again after installing the completed redesign."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total_nodes": {"name": "Total nodes"},
+      "active_nodes": {"name": "Active nodes"},
+      "connection_state": {"name": "Connection state"},
+      "interface_count": {"name": "Interfaces"},
+      "destination_count": {"name": "Destinations"},
+      "last_heard": {"name": "Last heard"},
+      "battery": {"name": "Battery"},
+      "voltage": {"name": "Voltage"},
+      "snr": {"name": "SNR"},
+      "rssi": {"name": "RSSI"},
+      "channel_utilization": {"name": "Channel utilization"},
+      "air_util_tx": {"name": "Air utilization TX"},
+      "hops_away": {"name": "Hops away"}
+    }
+  },
+  "services": {
+    "send_direct_message": {
+      "name": "Send direct message to a custom recipient",
+      "description": "Send one message using an exact recipient name or protocol ID, or an existing Home Assistant node device. For a live source-specific node dropdown, use the Device action named Send direct message to a known node. This performs a radio transmission and is never retried automatically.",
+      "fields": {
+        "source_device_id": {"name": "Source device", "description": "The local MeshMonitor radio source that will transmit the message."},
+        "destination_device_id": {"name": "Known destination node", "description": "One Home Assistant node device belonging to the selected source. Use either this field or Recipient ID or exact name."},
+        "recipient": {"name": "Recipient ID or exact name", "description": "Alternative to Known destination node. Enter an exact long name or short name currently known by the selected source, a Meshtastic node ID (! followed by 8 hexadecimal digits), or a 64-digit MeshCore public key."},
+        "text": {"name": "Message", "description": "Text to send. Protocol-specific length limits are validated before transmission."},
+        "reply_id": {"name": "Reply to message ID (optional)", "description": "Meshtastic only. Use the triggering message ID to preserve reply linkage."}
+      }
+    },
+    "send_channel_message": {
+      "name": "Send channel message",
+      "description": "Send one message to one channel through a selected MeshMonitor source. This performs a radio transmission and is never retried automatically.",
+      "fields": {
+        "source_device_id": {"name": "Source device", "description": "The local MeshMonitor radio source that will transmit the message."},
+        "channel": {"name": "Channel index", "description": "Meshtastic channels use 0–7; MeshCore channels use 0–255."},
+        "text": {"name": "Message", "description": "Text to send. Protocol-specific length limits are validated before transmission."}
+      }
+    },
+    "send_advert": {
+      "name": "Send MeshCore advert",
+      "description": "Send one MeshCore flood advert from the selected source. This action is limited to once every five minutes and is never retried automatically.",
+      "fields": {
+        "source_device_id": {"name": "Source device", "description": "The local MeshCore source that will transmit the advert."}
+      }
+    }
+  },
+  "device_automation": {
+    "extra_fields": {
+      "destination_node_id": "Destination node",
+      "channel": "Channel",
+      "text": "Message",
+      "sender": "Sender (optional)",
+      "text_required": "Message text is required",
+      "node": "Node (optional)",
+      "metric": "Telemetry metric (optional)",
+      "for": "For"
+    },
+    "action_type": {
+      "send_direct_message_to_known_node": "Send direct message to a known node",
+      "send_channel_message_to_known_channel": "Send channel message to a known channel",
+      "request_traceroute_from_known_node": "Request a traceroute from a known node",
+      "request_position_from_known_node": "Request position from a known node",
+      "request_node_info_from_known_node": "Request node information from a known node",
+      "request_neighbors_from_known_node": "Request neighbor information from a known node"
+      ,"favorite_known_node": "Add a known node to favorites"
+      ,"unfavorite_known_node": "Remove a known node from favorites"
+      ,"ignore_known_node": "Ignore a known node in MeshMonitor"
+      ,"unignore_known_node": "Stop ignoring a known node in MeshMonitor"
+    },
+    "trigger_type": {
+      "message_received": "A mesh message is received",
+      "direct_message_received": "A direct mesh message is received",
+      "channel_message_received": "A channel mesh message is received",
+      "source_connected": "The mesh source connects",
+      "source_disconnected": "The mesh source disconnects",
+      "automation_completed": "A MeshMonitor automation completes",
+      "automation_failed": "A MeshMonitor automation fails",
+      "node_discovered": "A new mesh node is discovered",
+      "node_updated": "Mesh node information changes",
+      "telemetry_received": "Mesh node telemetry is received",
+      "position_updated": "A mesh node position changes"
+    }
+  }
+}
