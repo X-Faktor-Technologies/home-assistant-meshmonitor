@@ -97,7 +97,10 @@ export const conversationSourceChoices = (conversation, sources, now = Date.now(
             (channel) => Number(channel.index) === conversation.channel,
           )
         : conversation.recipient !== "unknown" &&
-          (source.nodes || []).some((node) => node.id === conversation.recipient),
+          [
+            ...(source.nodes || []),
+            ...(source.reticulum?.peers || []),
+          ].some((node) => node.id === conversation.recipient),
     )
     .map((source) => {
       const fresh = sourceIsFresh(source, now);
@@ -112,7 +115,11 @@ export const conversationSourceChoices = (conversation, sources, now = Date.now(
 };
 
 export const messageByteLimit = (protocol, type) =>
-  protocol === "meshcore" ? (type === "direct" ? 150 : 130) : 200;
+  protocol === "reticulum"
+    ? 4096
+    : protocol === "meshcore"
+      ? (type === "direct" ? 150 : 130)
+      : 200;
 
 const hasValidUnicode = (text) => {
   for (let index = 0; index < text.length; index += 1) {

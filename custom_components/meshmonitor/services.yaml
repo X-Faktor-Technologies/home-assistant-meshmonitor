@@ -9,6 +9,8 @@ send_direct_message:
               model: Meshtastic source
             - integration: meshmonitor
               model: MeshCore source
+            - integration: meshmonitor
+              model: Reticulum source
           multiple: false
     destination_device_id:
       required: false

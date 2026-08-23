@@ -103,22 +103,47 @@ def _call(
 
 
 @pytest.mark.asyncio
-async def test_reticulum_source_is_rejected_by_outbound_service(
+async def test_reticulum_source_sends_one_supported_lxmf_direct_message(
     hass: HomeAssistant,
 ) -> None:
-    _source, source_device_id, _node_device_id = _runtime(hass, protocol="reticulum", transmit=True)
+    source, source_device_id, _node_device_id = _runtime(
+        hass, protocol="reticulum", transmit=True
+    )
+    source.client.send_reticulum_message = AsyncMock(
+        return_value=SimpleNamespace(id="lxmf-message", state="sending")
+    )
+    source.coordinator.data = SimpleNamespace(
+        destinations=(
+            SimpleNamespace(
+                destination_hash="a" * 32,
+                display_name="Friendly LXMF peer",
+            ),
+        )
+    )
     call = _call(
         hass,
         SERVICE_SEND_DIRECT_MESSAGE,
         {
             ATTR_SOURCE_DEVICE_ID: source_device_id,
-            ATTR_RECIPIENT: "a" * 32,
-            ATTR_TEXT: "must not send",
+            ATTR_RECIPIENT: "Friendly LXMF peer",
+            ATTR_TEXT: "Hello over LXMF",
         },
     )
 
-    with pytest.raises(ServiceValidationError, match="not supported"):
-        await _async_send_direct_message(call)
+    result = await _async_send_direct_message(call)
+
+    source.client.send_reticulum_message.assert_awaited_once_with(
+        source.source_id,
+        "Hello over LXMF",
+        to_destination_hash="a" * 32,
+    )
+    assert result == {
+        "accepted": True,
+        "source_id": source.source_id,
+        "protocol": "reticulum",
+        "message_id": "lxmf-message",
+        "delivery_state": "sending",
+    }
 
 
 @pytest.mark.asyncio
@@ -140,6 +165,7 @@ async def test_registers_all_ui_actions_with_visual_editor_descriptions(
     ]["filter"] == [
         {"integration": DOMAIN, "model": "Meshtastic source"},
         {"integration": DOMAIN, "model": "MeshCore source"},
+        {"integration": DOMAIN, "model": "Reticulum source"},
     ]
     assert descriptions[SERVICE_SEND_DIRECT_MESSAGE]["fields"][ATTR_DESTINATION_DEVICE_ID][
         "selector"

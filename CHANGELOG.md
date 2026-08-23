@@ -2,6 +2,15 @@
 
 ## 0.16.0
 
+- Keep every supported Node Details action visible, add clear action icons,
+  and reserve warning/error colors for ignore and removal controls.
+- Polish the map controls, empty-filter recovery, markers, legend, and mobile
+  layout, and include positioned Reticulum destinations without turning them
+  into Home Assistant node devices.
+- Add off-by-default administrator-only LXMF direct messaging through
+  MeshMonitor 4.15.1's source-scoped Reticulum endpoint, retaining the shared
+  transmit gate, replay guard, rate limit, stored-history reconciliation, and
+  no-retry behavior.
 - Rewrite the public setup and everyday-use documentation in plain language,
   and add privacy-reviewed Home Assistant setup images plus denser synthetic
   panel screenshots.
@@ -9,9 +18,8 @@
   and LXMF conversations to the shared Home Assistant daily console.
 - Preserve Reticulum delivery, method, signature-validation, ratchet, and
   available RF metadata in sanitized message events without inventing values.
-- Explicitly reject Reticulum in every Home Assistant outbound-action gate;
-  identity management, path probing, radio configuration, and LXMF sending
-  remain MeshMonitor-owned and out of scope.
+- Keep Reticulum identity management, path probing, radio configuration,
+  propagation changes, and automatic announces out of scope.
 - Add a protocol-native Reticulum Overview card and centralized accessible
   Meshtastic-green, MeshCore-purple, and Reticulum-blue identity palette.
 - Simplify the daily panel to Overview, Messages, Nodes, and Map; remove the

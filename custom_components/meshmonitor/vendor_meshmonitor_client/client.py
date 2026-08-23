@@ -378,6 +378,40 @@ class MeshMonitorClient:
             for message in messages
         ]
 
+    async def send_reticulum_message(
+        self,
+        source_id: str,
+        text: str,
+        *,
+        to_destination_hash: str,
+        title: str | None = None,
+        method: str | None = None,
+        reply_to_hash: str | None = None,
+    ) -> ReticulumMessage:
+        """Send one bounded LXMF direct message through a Reticulum source."""
+        clean_text = _validate_message_text(text, 4096)
+        if not re.fullmatch(r"[0-9a-fA-F]{32}", to_destination_hash):
+            raise ValueError("to_destination_hash must contain 32 hexadecimal digits")
+        payload: JsonObject = {
+            "to": to_destination_hash.lower(),
+            "content": clean_text,
+        }
+        if title is not None:
+            payload["title"] = _validate_message_text(title, 256)
+        if method is not None:
+            if method not in {"opportunistic", "direct", "propagated", "paper"}:
+                raise ValueError("unsupported LXMF delivery method")
+            payload["method"] = method
+        if reply_to_hash is not None:
+            if not re.fullmatch(r"[0-9a-fA-F]+", reply_to_hash):
+                raise ValueError("reply_to_hash must contain hexadecimal digits")
+            payload["replyToHash"] = reply_to_hash.lower()
+        response = await self._post_json(self._reticulum_path(source_id, "messages"), payload)
+        try:
+            return ReticulumMessage.from_dict(_nested_object(response, "data"))
+        except ValueError as exc:
+            raise MeshMonitorResponseError("invalid Reticulum send response") from exc
+
     async def get_reticulum_paths(self, source_id: str) -> list[ReticulumPath]:
         """Read stored paths only; unlike the probe API this has no network side effect."""
         payload = await self._get_json(self._reticulum_path(source_id, "paths"))

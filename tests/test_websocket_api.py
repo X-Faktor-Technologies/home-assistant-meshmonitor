@@ -16,9 +16,11 @@ from custom_components.meshmonitor.automation_coordinator import (
 from custom_components.meshmonitor.const import (
     CONF_ENABLE_FAVORITES,
     CONF_ENABLE_NODE_MANAGEMENT,
+    CONF_ENABLE_TRANSMIT,
     CONF_NODE_DEVICE_POLICY,
     CONF_SERVER_OPTIONS,
     CONF_SOURCE_OPTIONS,
+    CONF_SOURCE_TYPE,
     NODE_DEVICE_POLICY_FAVORITES,
 )
 from custom_components.meshmonitor.server_health_coordinator import (
@@ -468,6 +470,15 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
                 {
                     "destinationHash": "0123456789abcdef0123456789abcdef",
                     "displayName": "Synthetic LXMF peer",
+                    "appName": "lxmf",
+                    "lastSeen": 1770000000000,
+                    "latitude": 35.1,
+                    "longitude": -80.2,
+                    "altitude": 245,
+                    "rssi": -91,
+                    "snr": 7.5,
+                    "hops": 2,
+                    "isFavorite": True,
                 }
             ),
         ),
@@ -483,7 +494,7 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
             "source_name": "Synthetic RNS",
             "source_type": "reticulum",
         },
-        options={},
+        options={CONF_ENABLE_TRANSMIT: True},
         runtime_data=SimpleNamespace(
             coordinator=SimpleNamespace(data=snapshot, last_update_success=True)
         ),
@@ -495,7 +506,7 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
     assert payload["local_node_id"] is None
     assert payload["nodes"] == []
     assert payload["channels"] == []
-    assert payload["transmit_enabled"] is False
+    assert payload["transmit_enabled"] is True
     assert payload["reticulum"] == {
         "interface_count": 4,
         "destination_count": 3,
@@ -508,6 +519,15 @@ def test_reticulum_source_serialization_has_no_node_contract() -> None:
             {
                 "id": "0123456789abcdef0123456789abcdef",
                 "name": "Synthetic LXMF peer",
+                "app_name": "lxmf",
+                "last_seen": 1770000000000,
+                "latitude": 35.1,
+                "longitude": -80.2,
+                "altitude": 245.0,
+                "rssi": -91.0,
+                "snr": 7.5,
+                "hops": 2,
+                "favorite": True,
             }
         ],
     }
@@ -614,6 +634,52 @@ async def _run_scheduled_sends(hass: Mock) -> None:
     """Run background coroutines captured by the HA task mock."""
     for call in hass.async_create_task.call_args_list:
         await call.args[0]
+
+
+@pytest.mark.asyncio
+async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
+    peer_hash = "0123456789abcdef0123456789abcdef"
+    client = SimpleNamespace(
+        send_reticulum_message=AsyncMock(return_value=SimpleNamespace(state="sending"))
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-rns",
+        data={CONF_SOURCE_TYPE: "reticulum"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    hass.async_create_task = Mock()
+    connection = Mock()
+    message = {
+        "id": 88,
+        "entry_id": "entry-rns",
+        "source_id": "source-rns",
+        "protocol": "reticulum",
+        "text": "Hello over LXMF",
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": peer_hash,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+        await _run_scheduled_sends(hass)
+
+    client.send_reticulum_message.assert_awaited_once_with(
+        "source-rns", "Hello over LXMF", to_destination_hash=peer_hash
+    )
+    connection.send_result.assert_called_once_with(
+        88,
+        {"accepted": True, "message_id": None, "delivery_state": "ha_queued"},
+    )
 
 
 @pytest.mark.asyncio

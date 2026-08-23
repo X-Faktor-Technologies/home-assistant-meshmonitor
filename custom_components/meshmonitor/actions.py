@@ -16,6 +16,7 @@ from .const import (
     DOMAIN,
     SOURCE_TYPE_MESHCORE,
     SOURCE_TYPE_MESHTASTIC,
+    SOURCE_TYPE_RETICULUM,
 )
 from .registry import node_device_identifier, source_device_identifier
 from .transmit import (
@@ -107,7 +108,18 @@ async def _async_send_direct_message(call: ServiceCall) -> dict[str, Any] | None
     _ensure_transmit_enabled(source)
     _reserve_message(call, source, f"direct:{destination}:{call.data[ATTR_TEXT]}")
     try:
-        if source.source_type == SOURCE_TYPE_MESHCORE:
+        result: Any
+        if source.source_type == SOURCE_TYPE_RETICULUM:
+            if ATTR_REPLY_ID in call.data:
+                raise ServiceValidationError(
+                    "Numeric reply linkage is supported only by Meshtastic sources"
+                )
+            result = await source.client.send_reticulum_message(
+                source.source_id,
+                call.data[ATTR_TEXT],
+                to_destination_hash=destination,
+            )
+        elif source.source_type == SOURCE_TYPE_MESHCORE:
             if ATTR_REPLY_ID in call.data:
                 raise ServiceValidationError(
                     "Reply linkage is supported only by Meshtastic sources"
@@ -258,8 +270,36 @@ def _node_id_from_device(
 
 def _node_id_from_recipient(source: MeshMonitorSourceRuntime, recipient: str) -> str:
     """Resolve one source-local exact node name, or return a protocol-native ID."""
+    if source.source_type == SOURCE_TYPE_RETICULUM:
+        destinations = getattr(getattr(source.coordinator, "data", None), "destinations", ())
+        exact_hash = next(
+            (
+                str(destination.destination_hash)
+                for destination in destinations
+                if destination.destination_hash == recipient
+            ),
+            None,
+        )
+        if exact_hash is not None:
+            return exact_hash
+        normalized = recipient.strip().casefold()
+        matches = {
+            str(destination.destination_hash)
+            for destination in destinations
+            if destination.display_name
+            and destination.display_name.strip().casefold() == normalized
+        }
+        if len(matches) == 1:
+            return matches.pop()
+        if len(matches) > 1:
+            raise ServiceValidationError(
+                "That Reticulum name is ambiguous; use its destination hash"
+            )
+        return recipient
+
+    nodes = getattr(source.coordinator, "nodes", {})
     exact_id = next(
-        (node.id for node in source.coordinator.nodes.values() if node.id == recipient),
+        (str(node.id) for node in nodes.values() if node.id == recipient),
         None,
     )
     if exact_id is not None:
@@ -267,8 +307,8 @@ def _node_id_from_recipient(source: MeshMonitorSourceRuntime, recipient: str) ->
 
     normalized = recipient.casefold()
     matches = {
-        node.id
-        for node in source.coordinator.nodes.values()
+        str(node.id)
+        for node in nodes.values()
         if any(
             name is not None and name.strip().casefold() == normalized
             for name in (node.long_name, node.short_name)
@@ -284,7 +324,11 @@ def _node_id_from_recipient(source: MeshMonitorSourceRuntime, recipient: str) ->
 
 
 def _ensure_transmit_enabled(source: MeshMonitorSourceRuntime) -> None:
-    if source.source_type not in {SOURCE_TYPE_MESHCORE, SOURCE_TYPE_MESHTASTIC}:
+    if source.source_type not in {
+        SOURCE_TYPE_MESHCORE,
+        SOURCE_TYPE_MESHTASTIC,
+        SOURCE_TYPE_RETICULUM,
+    }:
         raise ServiceValidationError(
             "Outbound actions are not supported for this MeshMonitor source"
         )
@@ -328,8 +372,10 @@ def _send_result(source: MeshMonitorSourceRuntime, result: Any) -> dict[str, Any
         "accepted": True,
         "source_id": source.source_id,
         "protocol": source.source_type,
-        "message_id": result.message_id,
-        "delivery_state": result.delivery_state or "accepted",
+        "message_id": getattr(result, "message_id", None) or getattr(result, "id", None),
+        "delivery_state": getattr(result, "delivery_state", None)
+        or getattr(result, "state", None)
+        or "accepted",
     }
 
 

@@ -25,8 +25,10 @@ easy.
 - Events, device triggers, actions, and ready-to-import automation blueprints.
 - Optional favorites and message sending, disabled until you turn them on.
 
-Reticulum support is currently read-only. It includes source status,
-interface and destination counts, and LXMF history and events.
+Reticulum support includes source status, interface and destination details,
+positioned destinations on the map, LXMF history and events, and optional
+direct messaging. Sending stays off until you enable it for that exact source
+and grant `messages:write` to the MeshMonitor API user.
 
 ## Screenshots
 
