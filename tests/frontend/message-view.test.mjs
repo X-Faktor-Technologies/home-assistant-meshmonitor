@@ -10,6 +10,7 @@ import {
   messageDirectPeerId,
   messageDraftValidation,
   messagePresentation,
+  messageSenderName,
   messageSendNonce,
   messageTimestampMs,
   messagesInConversation,
@@ -109,6 +110,42 @@ test("Reticulum conversations use announced friendly names instead of hashes", (
   assert.equal(
     messageConversationCatalog([incoming], [reticulum])[0].name,
     "Elier's LXMF",
+  );
+});
+
+test("Reticulum message cards use the announced peer name with a hash fallback", () => {
+  const peerHash = "0123456789abcdef0123456789abcdef";
+  const otherSource = {
+    ...SOURCE,
+    source_id: "source-other",
+    protocol: "reticulum",
+    nodes: [],
+    reticulum: { peers: [{ id: peerHash, name: "Wrong source name" }] },
+  };
+  const reticulum = {
+    ...SOURCE,
+    protocol: "reticulum",
+    nodes: [],
+    reticulum: { peers: [{ id: peerHash, name: "Elier's LXMF" }] },
+  };
+  const incoming = {
+    protocol: "reticulum",
+    from_id: peerHash,
+    receptions: [{ source_id: "source-1" }],
+  };
+
+  assert.equal(messageSenderName(incoming, [otherSource, reticulum]), "Elier's LXMF");
+  assert.equal(
+    messagePresentation(incoming, 0, [otherSource, reticulum]).sender,
+    "Elier's LXMF",
+  );
+  assert.equal(
+    messageSenderName({ ...incoming, from_name: "Stored friendly name" }, [reticulum]),
+    "Stored friendly name",
+  );
+  assert.equal(
+    messageSenderName({ ...incoming, receptions: [] }, []),
+    "0123456789ab…abcdef",
   );
 });
 

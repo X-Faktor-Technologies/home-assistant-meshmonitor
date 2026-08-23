@@ -221,7 +221,35 @@ export const messageTimestampMs = (message) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const messagePresentation = (message, lastRead = 0) => {
+const normalizedPeerId = (value) => String(value || "").toLowerCase();
+
+export const messageSenderName = (message, sources = []) => {
+  if (messageIsOutgoing(message)) return "You";
+  if (message.from_name) return message.from_name;
+
+  const senderId = normalizedPeerId(message.from_id);
+  if (message.protocol === "reticulum" && senderId) {
+    const receptionSourceIds = new Set(
+      (message.receptions || [])
+        .map((reception) => reception.source_id)
+        .filter(Boolean),
+    );
+    const peer = sources
+      .filter((source) => source.protocol === "reticulum")
+      .filter(
+        (source) =>
+          receptionSourceIds.size === 0 || receptionSourceIds.has(source.source_id),
+      )
+      .flatMap((source) => source.reticulum?.peers || [])
+      .find((item) => normalizedPeerId(item.id) === senderId);
+    if (peer?.name && normalizedPeerId(peer.name) !== senderId) return peer.name;
+    if (senderId.length > 20) return `${senderId.slice(0, 12)}…${senderId.slice(-6)}`;
+  }
+
+  return message.from_id || "Unknown sender";
+};
+
+export const messagePresentation = (message, lastRead = 0, sources = []) => {
   const outgoing = messageIsOutgoing(message);
   const receptions = Array.isArray(message.receptions)
     ? message.receptions
@@ -251,9 +279,7 @@ export const messagePresentation = (message, lastRead = 0) => {
     deliveryState: message.delivery_state || "",
     outgoing,
     protocol: message.protocol || "unknown",
-    sender: outgoing
-      ? "You"
-      : message.from_name || message.from_id || "Unknown sender",
+    sender: messageSenderName(message, sources),
     sourceNames,
     sourceSummary,
     timestamp: messageTimestampMs(message),

@@ -2261,7 +2261,7 @@ class MeshMonitorPanel extends HTMLElement {
   _unread(messages) {
     return messages.filter(
       (message) =>
-        messagePresentation(message, this._messageReadAt(message)).outgoing !== true &&
+        messagePresentation(message, this._messageReadAt(message), this._data?.sources || []).outgoing !== true &&
         this._messageTime(message) > this._messageReadAt(message),
     ).length;
   }
@@ -2367,7 +2367,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._render();
       return;
     }
-    const presentation = messagePresentation(message, this._lastRead);
+    const presentation = messagePresentation(message, this._lastRead, this._data?.sources || []);
     this._selectConversation(key, true);
     this._replyContext = {
       sender: presentation.sender,
@@ -2505,7 +2505,7 @@ class MeshMonitorPanel extends HTMLElement {
     this._pendingMessages = this._pendingMessages.filter((pending) => {
       if (pending.state !== "queued") return true;
       return !messages.some((message) =>
-        messagePresentation(message, this._lastRead).outgoing === true &&
+        messagePresentation(message, this._lastRead, this._data?.sources || []).outgoing === true &&
         this._conversationKey(message) === pending.conversationKey &&
         message.text === pending.body &&
         Math.abs(this._messageTime(message) - pending.createdAt) < 300000
@@ -2516,7 +2516,7 @@ class MeshMonitorPanel extends HTMLElement {
       const replyKey = encodeURIComponent(
         JSON.stringify([message.entry_id || "", message.id || ""]),
       );
-      const presentation = messagePresentation(message, this._messageReadAt(message));
+      const presentation = messagePresentation(message, this._messageReadAt(message), this._data?.sources || []);
       const date = new Date(presentation.timestamp);
       const validDate = !Number.isNaN(date.valueOf()) && presentation.timestamp > 0;
       const day = validDate ? date.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}) : "Unknown date";
