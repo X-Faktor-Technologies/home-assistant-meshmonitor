@@ -13,9 +13,8 @@ releases may be useful for testing but are not supported versions.
   [troubleshooting guide](docs/TROUBLESHOOTING.md) for installation,
   permissions, missing data, recovery, panel, map, history, and message-event
   questions.
-- After the public repository exists, use its bug-report issue form for a
-  reproducible integration defect and its feature-request form for a bounded,
-  API-backed daily-console proposal.
+- Use the repository's bug-report issue form for a reproducible integration
+  problem and its feature-request form for a practical Home Assistant use case.
 - Follow [SECURITY.md](SECURITY.md) for vulnerabilities. Never use a public
   issue for a security report, credential exposure, or sensitive operational
   data.
@@ -24,9 +23,9 @@ releases may be useful for testing but are not supported versions.
   firmware, RF coverage, channel keys, MeshMonitor installation, source or
   transport administration, backups, or database maintenance.
 
-There is no authorized public repository or package yet. Until publication,
-the future issue routes above are unavailable and this repository does not
-promise an alternative public support channel.
+The source repository is public, but there is not yet a supported tagged
+release or package. Reports based on an untagged checkout may be closed if the
+same problem cannot be reproduced on the first supported release.
 
 ## Information to include
 
@@ -47,10 +46,9 @@ locally before sharing them.
 
 Maintainers may close requests that cannot be reproduced, concern unsupported
 versions, lack the requested sanitized evidence, duplicate an existing report,
-or fall outside the integration's product boundary. Feature requests must name
-a daily Home Assistant use case and documented or verified MeshMonitor API
-support; a generic passthrough or technical-administration feature is out of
-scope.
+or fall outside the integration's purpose. Feature requests should explain the
+Home Assistant task they would improve and identify any required MeshMonitor
+API support. General MeshMonitor administration remains outside this project.
 
 Support does not authorize anyone to deploy code, broaden permissions, enable
 writes, transmit over radio, change configuration, or probe a system. Keep

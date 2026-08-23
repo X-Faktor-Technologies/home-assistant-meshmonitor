@@ -1,449 +1,257 @@
 # MeshMonitor for Home Assistant
 
-Bring Meshtastic, MeshCore, and Reticulum into one Home Assistant workspace for everyday
-mesh monitoring, mapping, conversations, and safe operator actions. MeshMonitor
-remains the source of truth for radios and technical administration; this
-integration presents its API-backed data where dashboards, automations, and
-daily routines already live.
+See your Meshtastic, MeshCore, and Reticulum networks from Home Assistant.
+MeshMonitor adds a sidebar panel for checking source health, browsing nodes,
+viewing positions, reading conversations, and building Home Assistant
+automations from mesh activity.
+
+MeshMonitor still handles radio setup, channels, credentials, firmware, and
+server administration. This integration is meant to make day-to-day monitoring
+easy.
 
 > [!IMPORTANT]
-> Version 0.16.0 is an unreleased pre-1.0 source candidate. A public source
-> repository, tagged release, HACS distribution, and client package are separate
-> promotion steps. Do not treat an untagged checkout as a supported release.
+> Version 0.16.0 is still being prepared for its first release. The source is
+> public, but there is not yet a supported HACS release or Python package. If
+> you are testing the current source, back up Home Assistant first.
 
-## What you get
+## Highlights
 
-| Area | Meshtastic | MeshCore | Reticulum | Home Assistant experience |
-| --- | --- | --- | --- | --- |
-| Source health | Yes | Yes | Yes | Protocol-native source cards and diagnostic entities. |
-| Server version | Yes | Yes | Yes | Compact per-server version, health, and automation statistics. |
-| Node inventory | Yes | Yes | Destinations | Searchable, sortable inventory without inventing unavailable fields. |
-| Positions | Yes | Yes | Not currently | Optional GPS trackers and a unified interactive map. |
-| Conversations | Yes | Yes | LXMF | Permission-filtered history with browser-local pin, mute, and unread state. |
-| Automations | Yes | Yes | Inbound events | Native HA events, triggers, actions, and importable blueprints. |
-| Daily writes | Optional | Optional | No | Explicitly enabled favorites, node requests, and reviewed sends. |
-| Administration | Link only | Link only | MeshMonitor-owned | Radio, identity, and server administration stay in MeshMonitor. |
+- One Home Assistant panel for Meshtastic, MeshCore, and Reticulum.
+- A clear overview of connected sources, active nodes, positions, and recent
+  activity.
+- Searchable node and conversation views.
+- A combined map with Standard, Neutral Dark, and tile-free privacy styles.
+- Home Assistant devices, sensors, and optional GPS trackers.
+- Events, device triggers, actions, and ready-to-import automation blueprints.
+- Optional favorites and message sending, disabled until you turn them on.
 
-Reticulum 0.16.0 support is intentionally read-only: source connection,
-interface/destination counts, and LXMF history/events are included. Home
-Assistant does not send LXMF, probe paths, configure RNodes, or manage
-Reticulum identities.
-
-The built-in sidebar panel includes Overview, Messages, Nodes, and Map workspaces.
-Opening the panel, changing filters, or toggling a
-stored-data layer does not add API traffic. Normal updates come from shared,
-serialized coordinators rather than one request per entity.
+Reticulum support is currently read-only. It includes source status,
+interface and destination counts, and LXMF history and events.
 
 ## Screenshots
 
-Every value shown below is synthetic. The images render the real panel code but
-contain no live Home Assistant or mesh data; see the
-[screenshot provenance notes](docs/images/README.md).
+The data in these screenshots is fictional. The images use the real
+MeshMonitor panel without exposing a live network. See the
+[screenshot notes](docs/images/README.md) for details.
 
-![MeshMonitor Overview with a healthy daily-console headline, four at-a-glance metrics, and protocol-aware synthetic source-health cards](docs/images/panel-overview.png)
+![MeshMonitor Overview showing source health and activity across a fictional mesh network](docs/images/panel-overview.png)
 
-![MeshMonitor Messages workspace with a calm dark conversation timeline, selected conversation, source and protocol filters, synthetic senders, compact provenance, and guarded compose controls](docs/images/panel-conversations.png)
+![MeshMonitor Messages showing a fictional conversation and source filters](docs/images/panel-conversations.png)
 
-![MeshMonitor Nodes workspace with synthetic Meshtastic and MeshCore nodes, protocol colors, sortable health columns, and search controls](docs/images/panel-nodes.png)
+![MeshMonitor Nodes showing a searchable fictional node list](docs/images/panel-nodes.png)
 
-![MeshMonitor tile-free Map workspace with the built-in style selector, grouped controls, and four synthetic protocol-colored nodes](docs/images/panel-map.png)
+![MeshMonitor Map showing fictional nodes and links](docs/images/panel-map.png)
 
-## Product boundary
-
-Home Assistant is the daily mesh console. MeshMonitor owns source creation,
-transports, radio and module configuration, channel secrets, credentials,
-firmware, remote administration, backups, and database maintenance. The
-integration exposes only narrowly scoped API methods; it has no generic API
-passthrough. Optional radio writes are explicit, permission-gated, rate-limited,
-disabled by default, and never retried after an ambiguous response.
-
-Radio/configuration administration, live telemetry requests, reactions, and
-telemetry polls, discovery, reboot, purge, and other administrative operations
-are not included. The integration exposes only the features documented in this
-README and the user guide; undocumented MeshMonitor API routes are outside its
-supported surface.
-
-## Architecture
-
-```text
-MeshMonitor API
-  └─ one exact-server config entry and API client
-       ├─ one serialized coordinator per stored source
-       │    ├─ Home Assistant source and node entities
-       │    ├─ sanitized in-memory panel snapshots
-       │    └─ source connection baselines and events
-       ├─ one server-owned message coordinator
-       │    ├─ source-scoped reads merged into the Conversations view
-       │    └─ privacy-gated Home Assistant events
-       └─ one server health coordinator
-            ├─ health every five minutes
-            └─ cached update status no more than every six hours
-
-Home Assistant administrator
-  └─ authenticated panel WebSocket
-       └─ explicit bounded favorite, history, or message method
-            └─ MeshMonitor API
-```
-
-Each config entry represents one exact MeshMonitor server and retains its
-bounded supported-source inventory. Each stored source owns an independent
-coordinator and child device; enabled sources contribute one bounded
-stored-history read to the server's message timer. The browser talks only to
-authenticated Home Assistant WebSocket commands. Periodic reads are owned by
-coordinators.
-Browser-requested reads are limited to bounded node telemetry/link-quality,
-position-trail, or stored traceroute/history results. Daily writes are named
-operations with their own option, permission check, and safety limits.
-
-See [architecture and data flow](docs/ARCHITECTURE.md) for coordinator
-ownership, shared polling, panel transport, privacy boundaries, lifecycle
-behavior, and the complete bounded-write path.
-
-## Requirements
+## What you need
 
 - Home Assistant 2026.8.0 or newer.
-- A network-reachable MeshMonitor 4.14.x or 4.15.x server. Reticulum support is
-  verified against 4.15.1.
-- At least one visible Meshtastic, MeshCore, or Reticulum source.
-- A dedicated MeshMonitor API user and token. Start read-only and add an
-  optional write grant only for the corresponding explicitly enabled feature.
-- Browser access from Home Assistant to the configured MeshMonitor address if
-  you want direct administration links to work.
+- A MeshMonitor 4.14.x or 4.15.x server that Home Assistant can reach.
+- At least one Meshtastic, MeshCore, or Reticulum source in MeshMonitor.
+- A dedicated MeshMonitor API user and token.
 
-The integration currently carries a reviewed vendored copy of the typed
-`meshmonitor-api-client`, so it does not depend on manually populating HAOS
-`/config/deps`. The vendored copy will be replaced only after the standalone
-client has an approved, installable package release.
-
-## Least-privilege permissions
-
-Permission names below are MeshMonitor permissions. Grants remain subject to
-the relevant source and channel visibility rules.
-
-Start with a dedicated read-only API account. For the smallest useful
-monitoring profile, grant source visibility plus `nodes:read` and `info:read`.
-Add `messages:read` only when the Messages view and received-message events are
-needed. Every write below is optional, independently disabled in the
-integration, and should be added only for the feature the user intends to use.
-
-| Capability | Permission | Needed when |
-| --- | --- | --- |
-| Discover visible sources | A source-scoped read grant | Always; the setup flow must see the selected source. |
-| Nodes, current positions, topology, and stored neighbors | `nodes:read` | Always for Meshtastic monitoring; grant equivalent node visibility for MeshCore. |
-| Source status and telemetry | `info:read` | Source status and current telemetry; also required by the on-demand node telemetry and link-quality drawer. |
-| Channels and stored message history | `messages:read` | Bounded source-scoped message polling, Conversations, Channels, and received-message events. |
-| Private-position history | `nodes_private:read` | Only when private-position nodes should appear in on-demand trails. |
-| Server-persistent favorites | `nodes:write` | Only with **Allow server-persistent favorites** enabled. Meshtastic changes always use `syncToDevice: false`. |
-| Outbound messages | `messages:write` | Only with **Enable outbound messages** enabled. MeshCore also requires its server-side transmit gate. |
-| Remove a remote Meshtastic node from MeshMonitor | `messages:write` | Only with **Allow removing remote Meshtastic nodes and stored history** enabled. MeshMonitor 4.14.1 uses this permission for its local node-delete route. The action deletes the local node record plus stored messages, traceroutes, and telemetry; it never purges the node from the radio. |
-| Request traceroute or neighbor information | `traceroute:write` | Used only by explicit visual-editor actions, with both HA and MeshMonitor transmit gates enforced. |
-| Request position or node information; linked direct reply | `messages:write` | Used only by explicit visual-editor actions. No automatic retry or fan-out. |
-| Configured automations and recent runs | Global `automations:read` | Only with **Read configured automations and recent outcomes** enabled. Overview shows bounded sanitized definitions and outcomes; eligible terminal outcomes emit a restart-safe event. |
-
-MeshCore contact removal is not exposed because MeshMonitor 4.14.1 may delete
-the contact from the connected radio before forgetting it locally; that is not
-the same safety contract as **Remove from MeshMonitor**.
-
-Do not grant `packetmonitor:read`, configuration writes, source administration,
-or radio-action permissions for the current integration. A supported optional
-endpoint can be unavailable without taking the source offline; the panel keeps
-unsupported, permission-denied, supported-empty, and transient-error states
-distinct where that difference affects the operator.
+Start with a read-only API user. Add write permissions only if you decide to
+enable an optional feature such as favorites or message sending.
 
 ## Installation
 
-### HACS after a tagged release
+### HACS
 
-After a tagged release has been published and its HACS checks pass:
+HACS installation will be the recommended method after the first tagged
+release:
 
-1. In HACS, add the published repository as a custom **Integration** repository.
-2. Find **MeshMonitor**, choose **Download**, and restart Home Assistant.
-3. Continue with [configuration](#configuration).
+1. In HACS, open the menu and choose **Custom repositories**.
+2. Add this repository as an **Integration**.
+3. Find **MeshMonitor** in HACS and choose **Download**.
+4. Restart Home Assistant.
+5. Continue with [Add the integration](#add-the-integration).
 
-Until then, use only a reviewed source checkout. Do not install an unrelated
-project with a similar name.
+There is no supported tagged release yet. These steps are included so the
+first release can be tested before it is announced.
 
-### Manual source checkout
+### Manual testing
 
-For an authorized development checkout:
+1. Download or clone this repository.
+2. Copy the complete `custom_components/meshmonitor` folder to
+   `/config/custom_components/meshmonitor` in Home Assistant.
+3. Restart Home Assistant.
+4. Go to **Settings → Devices & services → Add integration** and search for
+   **MeshMonitor**.
 
-1. Copy the complete `custom_components/meshmonitor` directory into
-   `/config/custom_components/meshmonitor`.
-2. Restart Home Assistant.
-3. Confirm **MeshMonitor** appears under **Settings → Devices & services → Add
-   integration**.
+Copy the whole folder. It must include the `frontend`, `translations`, and
+`vendor_meshmonitor_client` folders.
 
-Keep the directory intact, including `frontend`, `translations`, and
-`vendor_meshmonitor_client`. Back up Home Assistant before replacing an
-existing development build.
+## Add the integration
 
-## Configuration
+### 1. Create a MeshMonitor API user
 
-1. In MeshMonitor, create a dedicated API user, scope it to the required
-   source/channel data, and issue a token with the permissions above.
-2. In Home Assistant, open **Settings → Devices & services → Add integration →
-   MeshMonitor**.
-3. Enter the MeshMonitor base URL as Home Assistant can reach it, plus the API
-   token.
-4. Confirm the bounded inventory of every supported visible Meshtastic,
-   MeshCore, and Reticulum source. Setup creates one exact-server entry.
-5. Open the entry's **Configure** action to review server settings and each
-   source's polling, entity, privacy, and write options.
+In MeshMonitor, create a separate API user for Home Assistant. Give it access
+only to the sources and channels you want Home Assistant to see.
 
-Use the entry's **Reconfigure** action to replace the server URL or token after
-all supported visible sources validate. Use **Refresh source inventory** for a
-confirmed non-destructive merge; absent-source options and identity are
-retained. Authentication failures start Home Assistant's reauthentication flow.
+For basic monitoring, grant:
 
-If setup can see a source but reports no nodes, enable **View on map** for at
-least one allowed channel in MeshMonitor and verify the token's node visibility.
+- source and channel visibility;
+- `nodes:read`; and
+- `info:read`.
 
-### Options
+Add `messages:read` if you want conversations and message events.
 
-| Option | Default | Range or effect |
+### 2. Add MeshMonitor in Home Assistant
+
+1. Open **Settings → Devices & services**.
+2. Choose **Add integration**.
+3. Search for **MeshMonitor**.
+
+![Home Assistant search results with MeshMonitor selected](docs/images/setup-find-integration.png)
+
+4. Enter the MeshMonitor address that Home Assistant can reach.
+5. Paste the API token.
+6. Review the sources found by the setup screen and finish setup.
+
+![MeshMonitor connection screen with the server address and API token fields](docs/images/setup-connect.png)
+
+Use the main MeshMonitor address, such as `https://mesh.example.com`. Do not add
+an API path, username, password, or token to the URL.
+
+### 3. Review the options
+
+Open the MeshMonitor integration and choose **Configure**. Settings are grouped
+into server-wide options and options for each source.
+
+![MeshMonitor Configure menu showing server settings, source settings, and source refresh](docs/images/setup-options-menu.png)
+
+Start with **Server settings** to choose whether the sidebar panel and
+automation monitoring are enabled.
+
+![MeshMonitor server settings in Home Assistant](docs/images/setup-server-settings.png)
+
+The defaults are suitable for read-only monitoring:
+
+| Setting | Default | What it does |
 | --- | --- | --- |
-| Node and telemetry polling | 60 seconds | 30–3,600 seconds. One serialized source snapshot feeds all entities and most panel data. |
-| Home Assistant GPS trackers | On | Creates trackers only for nodes with a valid reported position. |
-| Sidebar panel | On | Registers or removes the unified MeshMonitor panel. |
-| Home Assistant node devices | Source nodes + favorites | Server-global. Choose source nodes only, source nodes plus favorites, or every discovered node. All nodes remain visible and live in the MeshMonitor panel. Narrowing previews and confirms the HA-only registry cleanup; unfavoriting performs the same cleanup automatically. MeshMonitor data and recorder history are never deleted. |
-| Automation visibility polling | Off | Creates one read-only owner per exact server URL. Reads at most 25 definitions and ten 20-row histories every five minutes for compact server-card statistics and restart-safe terminal events. |
-| Message polling | On | Source-specific. Enables that source in Conversations and received-message events. |
-| Message polling interval | 30 seconds | Server-global, 15–900 seconds. One timer covers enabled stored sources. |
-| Expose message text in events | Off | Adds `text` to the event payload; panel message text is unaffected. |
-| Server-persistent favorites | Off | Allows explicit favorite changes and requires `nodes:write`. |
-| Outbound messages | Off | Allows administrator-only composition and requires `messages:write`. |
+| Node and telemetry polling | 60 seconds | Updates source and node information. |
+| GPS trackers | On | Adds trackers for nodes that report a current position. |
+| Sidebar panel | On | Shows MeshMonitor in the Home Assistant sidebar. |
+| Home Assistant node devices | Source nodes + favorites | Keeps the device list useful without creating a device for every node. |
+| Message polling | On | Loads conversations for that source when the token has `messages:read`. |
+| Message polling interval | 30 seconds | Updates all enabled conversations from the same server. |
+| Message text in events | Off | Keeps message bodies out of Home Assistant events by default. |
+| Favorites | Off | Allows favorite changes when the token has `nodes:write`. |
+| Outbound messages | Off | Allows administrator-only sending when the token has `messages:write`. |
 
-Option changes reload the server entry cleanly. Request volume scales with the
-enabled source inventory and optional coordinators. Source reads are serialized,
-and shared message and automation coordinators prevent duplicate polling for
-entries that use the same MeshMonitor server.
+Changing an option reloads the integration. It does not restart Home Assistant.
 
-## Using the integration
+## Permissions by feature
 
-For a task-oriented walkthrough of every device, entity, panel view, map
-layer, conversation feature, daily write, and browser-local preference, see
-the [user and panel guide](docs/USER_GUIDE.md).
+You do not need to grant every permission.
 
-### Entities and devices
+| If you want to… | MeshMonitor permission |
+| --- | --- |
+| See nodes, positions, and stored links | `nodes:read` |
+| See source status and current telemetry | `info:read` |
+| Read conversations and receive message events | `messages:read` |
+| View stored private-position trails | `nodes_private:read` |
+| Change favorites | `nodes:write` |
+| Send messages or request node information | `messages:write` |
+| Request traceroutes or neighbor information | `traceroute:write` |
+| Show MeshMonitor automation status | `automations:read` |
 
-Each source always becomes a Home Assistant device with total-node and, when
-available, active-node sensors. By default, only each monitored source node
-and remote nodes explicitly favorited in MeshMonitor become additional Home
-Assistant devices. Server options can narrow that to source nodes only or
-expand it to every discovered node. This registry policy never hides or deletes
-nodes in MeshMonitor or the integration panel. Qualifying nodes expose only the
-values MeshMonitor supplies: last seen, battery or voltage, SNR, RSSI, channel
-utilization, transmit airtime, hop count, and an optional GPS tracker. Unchanged
-tracker positions are not rewritten to the recorder.
+Do not grant configuration, source-administration, packet-monitor, firmware, or
+general radio-control permissions. The integration does not use them.
 
-### Panel and map
+## Using MeshMonitor
 
-The panel reads bounded, sanitized coordinator snapshots over authenticated
-Home Assistant WebSockets. It never receives the MeshMonitor token or raw API
-responses. Stored topology and neighbor/SNR layers refresh with the source
-coordinator. Position trails are explicit on-demand reads for one visible
-Meshtastic node, one fixed range from 1 hour to 7 days, and at most 1,000 fixes.
-The Nodes detail drawer can make exactly two additional on-demand reads for one
-visible node and the same fixed ranges: averaged telemetry and link quality,
-each capped at 1,000 sanitized points in the panel response.
-Overview presents compact counts from the off-by-default automation coordinator
-inside the matching server card. Unsupported, denied, empty, failed, truncated,
-pending, retained, and history-gap states remain distinct in coordinator data.
-The panel response adds no request, exposes no server URL or raw automation
-configuration/log content, and provides no create, edit, enable, run, or test
-control.
+The sidebar panel has four views:
 
-The default Neutral dark map uses a near-black charcoal treatment while
-keeping semantic markers and stored-link overlays legible; the unmodified
-Standard style shows the same OpenStreetMap tiles without that treatment.
-Select **Tiles off / privacy** to prevent
-external tile requests while retaining nodes and overlays. Direct MeshMonitor
-links are derived from the configured address, strip URL user information,
-query data, and fragments, and never include the API token. Because MeshMonitor
-4.14.1 has no stable node permalink, node links open the source's node inventory.
+- **Overview** shows which sources are connected, recent node activity,
+  positions, firmware information, and anything that needs attention.
+- **Messages** groups channel and direct-message history across your sources.
+- **Nodes** provides search, sorting, favorites, details, telemetry, and links
+  back to MeshMonitor.
+- **Map** shows current positions, stored links, and optional position trails.
 
-### Message event
+The full [user guide](docs/USER_GUIDE.md) explains each view and common tasks.
 
-With message polling enabled, a newly observed non-outgoing message fires
-`meshmonitor_message_received` once. Existing history is baselined so startup
-does not replay old messages.
+### Home Assistant devices and entities
 
-The event contains `message_id`, `protocol`, `source_ids`, sender ID/name,
-recipient ID, channel ID/name, `is_direct`, `timestamp`, and `direction`. It
-contains `text` only when **Expose message text in events** is enabled. Treat
-IDs, names, channel metadata, timestamps, and text as potentially sensitive
-when writing automations, logs, and notifications.
+Each configured source becomes a Home Assistant device. Nodes can also become
+devices, depending on the **Home Assistant node devices** setting. Available
+entities include last heard, battery or voltage, SNR, RSSI, channel use,
+transmit airtime, hop count, and an optional GPS tracker.
 
-Example trigger:
+MeshMonitor does not guess missing values. If a radio does not report a value,
+the matching entity is left out or shown as unavailable.
 
-```yaml
-automation:
-  - alias: "Mesh direct message received"
-    triggers:
-      - trigger: event
-        event_type: meshmonitor_message_received
-        event_data:
-          is_direct: true
-    actions:
-      - action: persistent_notification.create
-        data:
-          title: "Mesh message received"
-          message: "A direct mesh message arrived. Open the MeshMonitor panel."
-```
+### Map privacy
 
-This example deliberately avoids copying message or identity data into the
-notification. See the [automation examples guide](docs/AUTOMATION_EXAMPLES.md)
-for the exact event schema, restart behavior, direct and channel triggers, and
-privacy-preserving notification patterns.
+- **Standard** uses normal OpenStreetMap tiles.
+- **Neutral Dark** uses the same tiles with a dark visual treatment.
+- **Tiles off / privacy** shows nodes and links without contacting a map tile
+  provider.
 
-The repository also ships five importable, visual-editor-configurable
-blueprints for direct-message TTS, channel-message mobile notifications, HA
-entity alerts sent to mesh, sustained source outages, and MeshMonitor
-automation failures. Import remains an explicit user action; the integration
-does not silently create or modify automations. Message-based recipes clearly
-identify when content may be retained in Home Assistant traces and downstream
-TTS or notification systems.
+Standard and Neutral Dark send tile requests from your browser. Those requests
+can reveal the approximate area being viewed to the tile provider.
 
-### Source connection event
+### Automations
 
-After the first successful explicit connection value establishes a silent
-baseline, a strict API-reported change fires
-`meshmonitor_source_connection_changed`. Its exact four fields are
-`source_id`, `protocol`, `previous_connected`, and `connected`. Each exact
-server/source identity owns one in-memory baseline, so reload cannot multiply
-the event.
+The integration provides Home Assistant events, device triggers, actions, and
+five importable blueprints. Examples include announcing a direct message,
+sending an alert to mesh, and warning when a source stays offline.
 
-Missing connection data and failed refreshes are silent and preserve the last
-explicit boolean. Setup, restart, and the owning server entry's unload discard
-the in-memory baseline; no cursor is persisted. This event consumes the
-existing source snapshot and adds no MeshMonitor request. See the
-[automation examples guide](docs/AUTOMATION_EXAMPLES.md) for a bounded trigger
-example and lifecycle details.
+Message text is not included in events unless you enable it. The included
+examples avoid copying private message content into notifications by default.
+See [automation examples](docs/AUTOMATION_EXAMPLES.md) for setup instructions.
 
-### Favorites and outbound messages
+### Favorites and sending
 
-Both write features require two independent gates: the Home Assistant option
-and the narrow MeshMonitor permission. Favorites are explicit per-node changes;
-Meshtastic favorites are stored server-side without radio synchronization.
-Outbound composition is visible only to Home Assistant administrators, is
-limited to three submissions per minute, and rejects duplicate submissions.
-There is no service that an automation can call to transmit.
+Favorites and outbound messages are off by default. To enable either feature,
+you must turn on its Home Assistant option and grant its matching MeshMonitor
+permission.
+
+Sending is available only to Home Assistant administrators. It is limited to
+three submissions per minute and is not exposed as a general Home Assistant
+service, so an automation cannot accidentally create a transmit loop.
 
 ## Privacy and security
 
-- Tokens stay in Home Assistant config-entry storage and authenticated server
-  calls; diagnostics redact the server address and token.
-- The panel receives selected fields rather than raw MeshMonitor payloads.
-- Message text in Home Assistant events is disabled by default.
-- Browser preferences such as pins, mutes, filters, map state, and read markers
-  stay in that browser; they do not change MeshMonitor.
-- Enabling GPS trackers records positions through normal Home Assistant state
-  history. Keep them off if that retention is not appropriate.
-- Standard and Neutral dark map styles disclose tile requests and approximate
-  viewed map areas to the tile provider. Tiles off / privacy prevents those
-  requests.
-- Direct links open MeshMonitor in a new tab and still rely on the browser's
-  MeshMonitor authentication/session policy.
+- The MeshMonitor token stays in Home Assistant and is removed from
+  diagnostics.
+- The panel receives only the fields it needs, not raw API responses.
+- Message text in Home Assistant events is off by default.
+- Pins, mutes, filters, map choices, and read markers stay in the browser where
+  you set them.
+- GPS trackers use normal Home Assistant history. Turn them off if you do not
+  want positions recorded there.
+- Links back to MeshMonitor never include the API token.
 
-Never post tokens, raw API responses, message bodies, node identities, or
-coordinates in public issues. Read the dedicated [privacy and threat
-model](docs/PRIVACY_THREAT_MODEL.md) for data classification, trust boundaries,
-retention, external disclosures, write safety, abuse cases, and mitigations.
-Follow [SECURITY.md](SECURITY.md) for sensitive reports and review the
-capability boundary before granting new permissions.
-
-## Project policies
-
-Read [SUPPORT.md](SUPPORT.md) before requesting help or filing a bug. Proposed
-changes must follow [CONTRIBUTING.md](CONTRIBUTING.md), including the verified
-API and synthetic-data rules, and all project participation is governed by the
-[code of conduct](CODE_OF_CONDUCT.md). Security reports must use the private
-route described in [SECURITY.md](SECURITY.md), never a public issue.
+Never post tokens, message bodies, node identities, coordinates, or raw API
+responses in a public issue. Use the private reporting route in
+[SECURITY.md](SECURITY.md) for security problems.
 
 ## Troubleshooting
 
-For a complete symptom-based workflow covering installation, setup,
-authentication, least-privilege access, empty visibility, outage recovery,
-panel/map/history behavior, message events, and privacy-safe diagnostic
-collection, see the [troubleshooting guide](docs/TROUBLESHOOTING.md).
+If setup cannot see nodes, first check that the API user can see the intended
+source and channel. Meshtastic users should also enable **View on map** for at
+least one allowed channel in MeshMonitor.
 
-### Integration is not listed
+For connection errors, missing panels, empty maps, permissions, stale data,
+and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
-Verify the directory is exactly
-`/config/custom_components/meshmonitor/manifest.json`, restart Home Assistant,
-and check **Settings → System → Logs** for manifest or import errors. A partial
-copy that omits the vendored client or frontend is not supported.
+## Project status and documentation
 
-### Cannot connect or authentication failed
+This is pre-release software. A public repository does not yet mean that a
+HACS release, Python package, or production release has been approved. The
+remaining release checks are tracked in [RELEASE.md](RELEASE.md).
 
-Use the base URL Home Assistant Core can reach, without an API path suffix.
-Check TLS trust, DNS/routing, and the dedicated token in MeshMonitor. Use
-**Reconfigure** for URL changes or Home Assistant's reauthentication prompt for
-a rotated token. Do not place credentials in the URL.
-
-### Source is missing or setup says node visibility is required
-
-Confirm that the API user is scoped to the intended source, has `nodes:read`,
-and can view at least one allowed channel. For Meshtastic, enable MeshMonitor's
-**View on map** setting for an allowed channel. The setup flow intentionally
-rejects an empty visible node list because it usually indicates a visibility
-configuration problem.
-
-### Panel, messages, or trackers are missing
-
-Open the config entry's **Configure** action and verify the corresponding
-option. The sidebar is registered when at least one loaded entry enables it.
-Message history requires `messages:read`; trackers appear only for nodes with
-valid coordinates and do not backfill old position history.
-
-### A layer is empty, unavailable, or permission denied
-
-These are different conditions. Empty means MeshMonitor successfully returned
-no stored records for the selected source/range. Unavailable means the running
-server does not expose the optional route. Permission denied means the token
-lacks the route or private-position grant. Adjust permissions only for the
-feature you intend to use; do not add broad administration or radio grants.
-
-### Favorites or sending fails
-
-Confirm both the per-source Home Assistant option and the matching MeshMonitor
-permission. Outbound MeshCore messages also require MeshMonitor's server-side
-transmit gate. A `429`/rate-limit response is intentional protection; wait and
-retry manually rather than automating retries.
-
-### Data is stale or the source is unavailable
-
-Check MeshMonitor source health first, then the config entry and Home Assistant
-logs. Requests are serialized and time out rather than overlap indefinitely.
-After a temporary outage, the coordinator retries on its configured interval;
-avoid repeatedly reloading the integration because doing so adds setup traffic.
-
-When reporting a reproducible problem, include the integration version, Home
-Assistant version, MeshMonitor version, source protocol, sanitized log lines,
-and exact steps—never the token, private content, identities, or coordinates.
-See the [development and testing guide](docs/DEVELOPMENT.md) for reproducible
-local setup and validation commands.
-
-## Development and release status
-
-This is pre-release software. The source-publication, HACS, client-package,
-clean-install, soak, privacy, and promotion gates are tracked separately in
-[RELEASE.md](RELEASE.md). A public source repository does not by itself mean a
-PyPI package, HACS release, or production promotion has been approved.
-
-Useful project documents:
-
-- [Development and testing](docs/DEVELOPMENT.md)
-- [Release process](docs/RELEASE_PROCESS.md)
-- [User and panel guide](docs/USER_GUIDE.md)
+- [User guide](docs/USER_GUIDE.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Automation examples](docs/AUTOMATION_EXAMPLES.md)
-- [Troubleshooting guide](docs/TROUBLESHOOTING.md)
+- [Development and testing](docs/DEVELOPMENT.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Privacy and threat model](docs/PRIVACY_THREAT_MODEL.md)
-- [Architecture and data flow](docs/ARCHITECTURE.md)
+- [Contributing](CONTRIBUTING.md)
+- [Support](SUPPORT.md)
+- [Security](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Contributing guide](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Release checklist](RELEASE.md)
 
-The integration is not affiliated with or endorsed by the MeshMonitor,
-Meshtastic, MeshCore, or Home Assistant projects.
+MeshMonitor for Home Assistant is not affiliated with or endorsed by the
+MeshMonitor, Meshtastic, MeshCore, Reticulum, or Home Assistant projects.

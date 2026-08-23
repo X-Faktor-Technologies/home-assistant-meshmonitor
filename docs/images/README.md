@@ -1,32 +1,43 @@
 # Screenshot provenance
 
-The publication screenshots in this directory render the integration's actual
-sidebar-panel frontend against a hand-authored synthetic payload. They are not
-captures of a live Home Assistant or MeshMonitor system.
+The four panel screenshots in this directory use the integration's real
+frontend with a hand-written fictional data set. They show 28 fictional nodes,
+26 fictional positions, and a mixture of Meshtastic, MeshCore, and Reticulum
+activity. The names, IDs, messages, times, telemetry, links, and coordinates
+were invented for these images.
 
-All source and node names, identifiers, message bodies, timestamps, telemetry,
-link relationships, and coordinates were invented for the screenshots. Direct
-links use the reserved `.invalid` domain. The map was rendered in **Tiles off**
-privacy mode, so screenshot generation did not contact a map provider.
+The map uses the **Neutral Dark** style and OpenStreetMap tiles. Its coordinates
+were chosen only for the screenshot and do not represent a real mesh network or
+the project's developers. Map attribution remains visible in the image.
 
-The images demonstrate layout and supported capabilities; their counts and
-values are examples, not a performance or coverage claim. When replacing an
-image, review every visible field and its Markdown alt text before committing
-it. Never use live mesh data unless every value has been irreversibly
-sanitized.
+The setup images are cropped from Home Assistant's real integration dialogs.
+The connection fields are empty, no credentials are visible, and the page
+behind each dialog is excluded. The server-settings description reflects the
+wording included with the same documentation update.
 
-The current images were generated on 2026-08-22 from the 0.16.0 publication
-candidate with Brave/Puppeteer at 1440×900. The same four views were also
-checked at 390×844 with no document-level horizontal overflow. The fixture
-includes all three protocols and uses only invented identities and content.
+These images explain the interface; their counts and values are examples, not
+a coverage or performance claim. Before replacing one, review every visible
+field and its Markdown alt text. Do not use live mesh data unless every value
+has been irreversibly sanitized.
 
-The SHA-256 values are:
+The images were prepared on 2026-08-23. The panel was checked at 1440×900 and
+390×844 with no page-level horizontal overflow.
 
-- `bd7130e309fa0be649706e5a250a074044e79f05e0a7da8fb873e85b4cc6aa91`
-  (Overview)
-- `b0f42967965f3a7f3b8185c09b0cab87ea1ed54c06a2b8ccadd6f3e4f37fd365`
-  (Messages)
-- `56f7b75e6e0272933489ae817f5eba04110c3f114640ae36d08387f841cf8a70`
-  (Nodes)
-- `1ff43a788118579376483530c28ec8717a22b817a7ea387076f37d2e94d589fc`
-  (Map)
+SHA-256 checksums:
+
+- `d69cdf0e0745be1b1bd283150dab9a44b03870dc977128c9dcae0d5f45b945d9`
+  (`panel-overview.png`)
+- `b58ad4f90225e0a5b78e6e930d923049f11c104c389480014648c8bc2cadc06b`
+  (`panel-conversations.png`)
+- `34d2a8beab77e3f556ed4dbe7fcd187b52db081288108f7a7baef2ec98f41e28`
+  (`panel-nodes.png`)
+- `d2efe2ec94968e5ae662756a24bda774de1463a1e177b9134bca4745d6c2c974`
+  (`panel-map.png`)
+- `a0fcc4ba87a31bbc76ff580edb8a9693c4f6c803fefba11ebce8edcd9aa6593a`
+  (`setup-find-integration.png`)
+- `a10bac251bec19ca5db17fade56c1ef9e51f464d9fa3ca0d03170263365e54f2`
+  (`setup-connect.png`)
+- `df02760228ad6d0cab90acaaa925780f1a555572b19484a682a43c7454f26724`
+  (`setup-options-menu.png`)
+- `7c41f506381432ea94b0e66159bae3886bc88642893978a0226b5128f9fc646b`
+  (`setup-server-settings.png`)

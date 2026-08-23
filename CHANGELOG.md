@@ -2,6 +2,9 @@
 
 ## 0.16.0
 
+- Rewrite the public setup and everyday-use documentation in plain language,
+  and add privacy-reviewed Home Assistant setup images plus denser synthetic
+  panel screenshots.
 - Add read-only Reticulum source discovery, connection and inventory diagnostics,
   and LXMF conversations to the shared Home Assistant daily console.
 - Preserve Reticulum delivery, method, signature-validation, ratchet, and

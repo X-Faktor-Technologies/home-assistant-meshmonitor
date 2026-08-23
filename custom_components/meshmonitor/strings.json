@@ -37,7 +37,7 @@
       "unknown": "Unexpected response from MeshMonitor."
     },
     "abort": {
-      "already_configured": "This exact MeshMonitor server is already configured.",
+      "already_configured": "This MeshMonitor server is already configured.",
       "cannot_connect": "Unable to validate the selected source.",
       "invalid_auth": "The API token was rejected.",
       "insufficient_permissions": "The token cannot read node data for this source.",
@@ -59,7 +59,7 @@
       },
       "server_settings": {
       "title": "Server settings",
-      "description": "Configure behavior shared once by this exact MeshMonitor server.",
+      "description": "Choose the settings shared by all sources on this MeshMonitor server.",
       "data": {
         "enable_sidebar_panel": "Show the MeshMonitor sidebar panel",
         "enable_automation_visibility": "Read configured automations and recent outcomes (requires global automations:read)",
