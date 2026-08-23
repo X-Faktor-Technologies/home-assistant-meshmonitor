@@ -102,6 +102,11 @@ Select a node to open its detail drawer. Depending on the protocol and your
 permissions, the drawer can show current telemetry, link quality, recent
 history, favorite controls, and a link to the matching source in MeshMonitor.
 
+MeshMonitor 4.15.1 cannot authenticate API-token requests to its stored-node
+deletion route. The integration therefore does not show a remove-node control.
+Delete stored nodes in MeshMonitor itself until a released server version fixes
+Bearer-token authentication for that route.
+
 ### Choose which nodes become Home Assistant devices
 
 The **Home Assistant node devices** option controls the Devices & services

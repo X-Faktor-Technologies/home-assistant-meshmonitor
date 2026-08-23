@@ -99,8 +99,6 @@ test("node details maximize reported values without placeholder clutter", () => 
     requests: false,
     ignore: false,
     device: true,
-    remove: false,
-    removeEnabled: false,
   });
   assert.deepEqual(
     presentation.groups.map((group) => group.title),
@@ -157,30 +155,17 @@ test("primary actions are capability driven and local nodes cannot message thems
   });
 });
 
-test("local-only removal is Meshtastic-only, remote-only, and independently gated", () => {
-  const remote = nodeDetailPresentation(
+test("stored-node removal is not exposed while MeshMonitor rejects API tokens", () => {
+  const actions = nodeDetailPresentation(
     { id: "!1234abcd" },
-    { protocol: "meshtastic", local_node_id: "!ffffffff", node_removal_enabled: true },
-  );
-  assert.equal(remote.actions.remove, true);
-  assert.equal(remote.actions.removeEnabled, true);
-  const disabled = nodeDetailPresentation(
-    { id: "!1234abcd" },
-    { protocol: "meshtastic", local_node_id: "!ffffffff", node_removal_enabled: false },
-  );
-  assert.equal(disabled.actions.remove, true);
-  assert.equal(disabled.actions.removeEnabled, false);
-  assert.equal(
-    nodeDetailPresentation({ id: "!1234abcd" }, { protocol: "meshcore" }).actions.remove,
-    false,
-  );
-  assert.equal(
-    nodeDetailPresentation(
-      { id: "!1234abcd" },
-      { protocol: "meshtastic", local_node_id: "!1234abcd", node_removal_enabled: true },
-    ).actions.remove,
-    false,
-  );
+    {
+      protocol: "meshtastic",
+      local_node_id: "!ffffffff",
+      node_removal_enabled: true,
+    },
+  ).actions;
+  assert.equal(Object.hasOwn(actions, "remove"), false);
+  assert.equal(Object.hasOwn(actions, "removeEnabled"), false);
 });
 
 test("manual request and ignore actions are capability driven", () => {
@@ -219,16 +204,14 @@ test("drawer renders capability actions and gates diagnostics to monitored nodes
   assert.doesNotMatch(panel, /More actions/);
   assert.doesNotMatch(panel, /node-detail-more/);
   assert.match(panel, /mdi:message-text-outline/);
-  assert.match(panel, /mdi:delete-outline/);
+  assert.doesNotMatch(panel, /Remove from MeshMonitor/);
+  assert.doesNotMatch(panel, /node-detail-remove/);
+  assert.doesNotMatch(panel, /meshmonitor\/remove_node/);
   assert.match(panel, /does not confirm that the node replied/);
   assert.match(panel, /<span>RSSI<\/span>[\s\S]+<span>SNR<\/span>/);
   assert.match(panel, /presentation\.actions\.map[\s\S]+node-detail-map/);
   assert.match(panel, /node-detail-message[\s\S]+node-detail-map[\s\S]+data-node-request="traceroute"/);
-  assert.match(panel, /\.node-detail-actions #node-detail-remove \{ grid-column:2; \}/);
-  assert.match(panel, /\.node-detail-actions #node-detail-remove\{grid-column:1\}/);
   assert.match(panel, /presentation\.actions\.device[\s\S]+Open HA device/);
-  assert.match(panel, /presentation\.actions\.remove[\s\S]+Remove from MeshMonitor/);
-  assert.match(panel, /It does not purge the node from the radio/);
   assert.match(panel, /\.node-detail-group\.position \{ grid-column:1\/-1; \}/);
   assert.match(panel, /\.node-detail-group\.position \.node-detail-meta \{ grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(panel, /group\.empty[\s\S]+Position has not been reported for this node\./);

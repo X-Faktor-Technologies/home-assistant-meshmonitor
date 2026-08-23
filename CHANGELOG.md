@@ -2,8 +2,11 @@
 
 ## 0.16.0
 
+- Temporarily hide stored-node removal because MeshMonitor 4.15.1 cannot
+  authenticate API tokens on that route; keep the guarded backend support for
+  a future verified server fix.
 - Keep every supported Node Details action visible, add clear action icons,
-  and reserve warning/error colors for ignore and removal controls.
+  and reserve the warning color for ignore controls.
 - Polish the map controls, empty-filter recovery, markers, legend, and mobile
   layout, and include positioned Reticulum destinations without turning them
   into Home Assistant node devices.
