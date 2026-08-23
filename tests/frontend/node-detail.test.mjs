@@ -223,6 +223,9 @@ test("drawer renders capability actions and gates diagnostics to monitored nodes
   assert.match(panel, /does not confirm that the node replied/);
   assert.match(panel, /<span>RSSI<\/span>[\s\S]+<span>SNR<\/span>/);
   assert.match(panel, /presentation\.actions\.map[\s\S]+node-detail-map/);
+  assert.match(panel, /node-detail-message[\s\S]+node-detail-map[\s\S]+data-node-request="traceroute"/);
+  assert.match(panel, /\.node-detail-actions #node-detail-remove \{ grid-column:2; \}/);
+  assert.match(panel, /\.node-detail-actions #node-detail-remove\{grid-column:1\}/);
   assert.match(panel, /presentation\.actions\.device[\s\S]+Open HA device/);
   assert.match(panel, /presentation\.actions\.remove[\s\S]+Remove from MeshMonitor/);
   assert.match(panel, /It does not purge the node from the radio/);
