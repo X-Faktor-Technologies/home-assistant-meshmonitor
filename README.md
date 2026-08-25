@@ -71,9 +71,16 @@ HACS is the recommended installation method for tagged releases:
    and select **Add**.
 4. Close the custom-repositories window, then find and open **MeshMonitor** in
    HACS.
-5. For a prerelease, enable **Show beta** for the repository if the beta version
-   is not already shown.
-6. Choose **Download** and select `v0.16.0-beta.1`.
+5. Choose **Download**, select `v0.16.0-beta.1`, and finish the download.
+6. Before restarting, enable HACS prerelease tracking for MeshMonitor:
+   - Go to **Settings → Devices & services → Devices**.
+   - Open the **MeshMonitor** device whose manufacturer is **xFaktorTech** and
+     model is **integration**.
+   - Open **MeshMonitor pre-release**, enable the disabled entity, and turn the
+     switch on.
+
+   This prevents HACS from incorrectly offering the branch commit as an update
+   to the installed beta.
 7. Restart Home Assistant.
 8. Continue with [Add the integration](#add-the-integration).
 
