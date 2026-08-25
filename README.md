@@ -10,9 +10,9 @@ server administration. This integration is meant to make day-to-day monitoring
 easy.
 
 > [!IMPORTANT]
-> Version 0.16.0 is still being prepared for its first release. The source is
-> public, but there is not yet a supported HACS release or Python package. If
-> you are testing the current source, back up Home Assistant first.
+> Version 0.16.0-beta.1 is the first public prerelease. It is intended for
+> careful testing before the stable 0.16.0 release. Back up Home Assistant
+> before installing or upgrading.
 
 ## Highlights
 
@@ -58,17 +58,18 @@ enable an optional feature such as favorites or message sending.
 
 ### HACS
 
-HACS installation will be the recommended method after the first tagged
-release:
+HACS is the recommended installation method for tagged releases:
 
 1. In HACS, open the menu and choose **Custom repositories**.
 2. Add this repository as an **Integration**.
-3. Find **MeshMonitor** in HACS and choose **Download**.
-4. Restart Home Assistant.
-5. Continue with [Add the integration](#add-the-integration).
+3. Find **MeshMonitor** in HACS. For a prerelease, enable **Show beta** for the
+   repository if the beta version is not already shown.
+4. Choose **Download** and select the tagged version.
+5. Restart Home Assistant.
+6. Continue with [Add the integration](#add-the-integration).
 
-There is no supported tagged release yet. These steps are included so the
-first release can be tested before it is announced.
+Prereleases are for validation and may still change before the first stable
+release. Use the version shown in Home Assistant when reporting a problem.
 
 ### Manual testing
 

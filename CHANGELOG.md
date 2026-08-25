@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.16.0
+## 0.16.0-beta.1
 
 - Temporarily hide stored-node removal because MeshMonitor 4.15.1 cannot
   authenticate API tokens on that route; keep the guarded backend support for
