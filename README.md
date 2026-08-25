@@ -9,10 +9,8 @@ MeshMonitor still handles radio setup, channels, credentials, firmware, and
 server administration. This integration is meant to make day-to-day monitoring
 easy.
 
-> [!IMPORTANT]
-> Version 0.16.0-beta.1 is the first public prerelease. It is intended for
-> careful testing before the stable 0.16.0 release. Back up Home Assistant
-> before installing or upgrading.
+The first stable public release is `0.16.0`. Back up Home Assistant before
+installing or upgrading a custom integration.
 
 ## Highlights
 
@@ -71,21 +69,12 @@ HACS is the recommended installation method for tagged releases:
    and select **Add**.
 4. Close the custom-repositories window, then find and open **MeshMonitor** in
    HACS.
-5. Choose **Download**, select `v0.16.0-beta.1`, and finish the download.
-6. Before restarting, enable HACS prerelease tracking for MeshMonitor:
-   - Go to **Settings → Devices & services → Devices**.
-   - Open the **MeshMonitor** device whose manufacturer is **xFaktorTech** and
-     model is **integration**.
-   - Open **MeshMonitor pre-release**, enable the disabled entity, and turn the
-     switch on.
+5. Choose **Download** and finish the download. HACS selects the latest stable
+   release automatically; prerelease tracking is not required.
+6. Restart Home Assistant.
+7. Continue with [Add the integration](#add-the-integration).
 
-   This prevents HACS from incorrectly offering the branch commit as an update
-   to the installed beta.
-7. Restart Home Assistant.
-8. Continue with [Add the integration](#add-the-integration).
-
-Prereleases are for validation and may still change before the first stable
-release. Use the version shown in Home Assistant when reporting a problem.
+Use the version shown in Home Assistant when reporting a problem.
 
 ### Manual testing
 

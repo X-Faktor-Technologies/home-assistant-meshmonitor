@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.16.0-beta.1
+## 0.16.0
+
+- Promote the clean-install-tested public beta to the first stable release so
+  HACS installs it without enabling prerelease tracking.
+- Clarify the verified HACS custom-repository flow and provide the exact
+  copyable repository URL.
 
 - Temporarily hide stored-node removal because MeshMonitor 4.15.1 cannot
   authenticate API tokens on that route; keep the guarded backend support for
