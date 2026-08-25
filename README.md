@@ -61,12 +61,21 @@ enable an optional feature such as favorites or message sending.
 HACS is the recommended installation method for tagged releases:
 
 1. In HACS, open the menu and choose **Custom repositories**.
-2. Add this repository as an **Integration**.
-3. Find **MeshMonitor** in HACS. For a prerelease, enable **Show beta** for the
-   repository if the beta version is not already shown.
-4. Choose **Download** and select the tagged version.
-5. Restart Home Assistant.
-6. Continue with [Add the integration](#add-the-integration).
+2. Copy this repository URL:
+
+   ```text
+   https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor
+   ```
+
+3. Paste the URL into **Repository**, choose **Integration** as the category,
+   and select **Add**.
+4. Close the custom-repositories window, then find and open **MeshMonitor** in
+   HACS.
+5. For a prerelease, enable **Show beta** for the repository if the beta version
+   is not already shown.
+6. Choose **Download** and select `v0.16.0-beta.1`.
+7. Restart Home Assistant.
+8. Continue with [Add the integration](#add-the-integration).
 
 Prereleases are for validation and may still change before the first stable
 release. Use the version shown in Home Assistant when reporting a problem.
@@ -241,9 +250,13 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-This is pre-release software. A public repository does not yet mean that a
-HACS release, Python package, or production release has been approved. The
-remaining release checks are tracked in [RELEASE.md](RELEASE.md).
+Version `v0.16.0-beta.1` is the first public prerelease and is available through
+the GitHub release and HACS custom-repository flow above. It is being validated
+through a clean Home Assistant installation before the first stable `v0.16.0`
+release. The beta is not a stable or production recommendation, and later beta
+builds may require upgrade testing. See the
+[v0.16.0-beta.1 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.16.0-beta.1)
+and [release process](docs/RELEASE_PROCESS.md) for details.
 
 - [User guide](docs/USER_GUIDE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
