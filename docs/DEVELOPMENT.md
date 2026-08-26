@@ -52,7 +52,7 @@ node --test tests/frontend/*.test.mjs
 git diff --check
 ```
 
-Pytest should report 110 passing tests and the Node runner should report 46
+Pytest should report 190 passing tests and the Node runner should report 84
 passing frontend tests in the current tree. The Python suite blocks
 unexpected socket use, and all MeshMonitor client interactions are mocked, so
 these commands must not contact a live mesh service. Run a focused test during
@@ -72,7 +72,7 @@ Hassfest and HACS validation run in CI. Before publication, the release plan
 also requires clean-install, upgrade, rollback, removal, privacy, link, secret,
 and live-lab checks; the unit suite is not a substitute for those gates.
 
-## Type checking and the Home Assistant limitation
+## Type checking
 
 The strict project configuration is exercised with:
 
@@ -80,25 +80,10 @@ The strict project configuration is exercised with:
 .venv/bin/mypy
 ```
 
-Because the strict project target remains Python 3.12 while the Home Assistant
-test dependency contains Python 3.13-only type-parameter default syntax, the
-canonical command stops in Home Assistant before project analysis. The
-2026-08-17 fresh-clone publication environment resolved Home Assistant 2026.2.3
-through `pytest-homeassistant-custom-component`. An explicit compatibility
-audit with `.venv/bin/mypy --python-version 3.13` reports 14 known errors in
-four integration files. They come from
-Home Assistant's runtime exports not being represented as public typed
-exports, plus one existing message-coordinator key-narrowing error:
-`ConfigEntryAuthFailed`, WebSocket decorators and `ActiveConnection`, and
-`TrackerEntity`.
-These are dependency typing limitations, not a passing gate, and must not be
-hidden with broad ignores.
-
-Review mypy output for changes in the error count, files, or symbols. A new
-error outside that known set is a regression. Revisit the baseline when the
-Home Assistant test dependency is upgraded; until the exports align, pytest,
-Ruff, frontend syntax, and the CI Hassfest/HACS jobs remain the enforceable
-checks.
+The current Python 3.13 development environment completes strict mypy analysis
+without errors. Type checking is therefore an enforceable validation gate
+alongside pytest, Ruff, frontend tests, Hassfest, and HACS validation. Do not
+hide new dependency or project errors with broad ignores.
 
 ## Test organization
 
