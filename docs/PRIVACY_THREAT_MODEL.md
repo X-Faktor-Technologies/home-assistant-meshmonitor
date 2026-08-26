@@ -1,7 +1,11 @@
 # Privacy and threat model
 
-This document describes the privacy and security boundaries of MeshMonitor for
-Home Assistant 0.16.0. It covers the current API-backed entities, panel,
+This page explains what sensitive information the integration can handle, what
+it deliberately leaves out, and the safeguards contributors must preserve. It
+is written for reviewers and advanced users; everyday privacy choices are
+summarized in the [user guide](USER_GUIDE.md).
+
+It covers the integration's 0.16.0 API-backed entities, panel,
 messages, map, position history, favorites, and outbound-message surface. It
 does not make claims about MeshMonitor, Meshtastic, MeshCore, Home Assistant,
 radio firmware, or notification providers beyond how this integration uses

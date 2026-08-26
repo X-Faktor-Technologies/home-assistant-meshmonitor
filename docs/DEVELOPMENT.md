@@ -1,9 +1,13 @@
 # Development and testing
 
-This guide describes a reproducible local environment for changing and
-validating the MeshMonitor custom integration. The default test suite is
-self-contained: it does not require a running Home Assistant instance, a
-MeshMonitor server, an API token, or radio access.
+This page is for contributors changing the integration. If you only want to
+install or use it, start with the [README](../README.md) or
+[user guide](USER_GUIDE.md).
+
+The steps below create a repeatable development environment and run the same
+kinds of checks used by the project. The normal test suite is self-contained:
+it does not need a running Home Assistant system, MeshMonitor server, API token,
+or radio.
 
 ## Required tools
 

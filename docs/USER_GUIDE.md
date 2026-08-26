@@ -1,7 +1,10 @@
 # MeshMonitor user guide
 
-This guide covers the everyday parts of MeshMonitor for Home Assistant. For
-installation and first-time setup, start with the [README](../README.md).
+This guide covers the things you are most likely to do after setup: check the
+mesh, read messages, find nodes, use the map, and create automations. For
+installation, start with the [README](../README.md).
+
+You do not need to understand the MeshMonitor API to use this guide.
 
 ## Where to find MeshMonitor
 
@@ -15,10 +18,10 @@ Choose **Server settings** to show or hide the sidebar panel.
 
 ![MeshMonitor server settings in Home Assistant](images/setup-server-settings.png)
 
-The panel combines every MeshMonitor server and source you have added to Home
-Assistant. It refreshes automatically. The **Refresh** button updates the page
-from information Home Assistant already has; it does not force the radios to
-transmit or immediately poll MeshMonitor.
+The panel combines every MeshMonitor server and source you added to Home
+Assistant. It updates automatically. The **Refresh** button redraws the page
+using information Home Assistant already collected. It does not make a radio
+transmit.
 
 ## Overview
 
@@ -35,9 +38,9 @@ Each source card shows connection state, last update, node and position counts,
 and available firmware or radio details. A source is shown as needing attention
 when it is disconnected, has stopped updating, or returned incomplete data.
 
-If an older successful update is still available after a temporary error, the
-panel says that it is showing older information instead of making the source
-look healthy.
+After a temporary error, the panel may keep showing the last good information.
+It clearly marks that information as old instead of making the source look
+healthy.
 
 ## Messages
 
@@ -63,9 +66,9 @@ Check both of these:
    **Configure** screen.
 2. The MeshMonitor API user has `messages:read` for the source and channel.
 
-The first successful update records the current message list without firing
-events for old messages. Only messages received afterward can trigger a new
-`meshmonitor_message_received` event.
+When message polling first starts, Home Assistant quietly records the messages
+already there. It does not turn old messages into new alerts. Messages received
+afterward can trigger automations.
 
 ### Send a message
 
@@ -83,8 +86,8 @@ integration does not automatically resend an uncertain transmission.
 ## Nodes
 
 Use **Nodes** to search and sort all visible Meshtastic and MeshCore nodes.
-Reticulum destinations are shown where the server supplies them, but they do
-not pretend to have Meshtastic-style radio fields.
+Reticulum destinations appear when the server provides them. Fields that apply
+only to Meshtastic radios are simply left out.
 
 The table can show:
 
@@ -173,10 +176,11 @@ Home Assistant history and retention settings.
 
 ## Automations
 
-MeshMonitor can provide Home Assistant events, device triggers, and actions.
-The repository also includes blueprints for common examples.
+MeshMonitor can start Home Assistant automations when something happens on the
+mesh. It can also send messages from an automation when you explicitly enable
+outbound messaging. Ready-made blueprints cover several common examples.
 
-Useful events include:
+Common triggers include:
 
 - `meshmonitor_message_received` for a newly received message;
 - `meshmonitor_source_connection_changed` when a source explicitly changes
@@ -188,8 +192,8 @@ Message text is left out of events unless **Expose message text in events** is
 enabled. This helps prevent message bodies from being copied into automation
 traces, notifications, and logs.
 
-See [automation examples](AUTOMATION_EXAMPLES.md) for complete event fields and
-blueprint instructions.
+See [automation examples](AUTOMATION_EXAMPLES.md) for step-by-step blueprint
+instructions, copy-ready examples, and the advanced event-field reference.
 
 ## Common tasks
 
