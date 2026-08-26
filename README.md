@@ -246,12 +246,10 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-Version `v0.16.0-beta.1` is the first public prerelease and is available through
-the GitHub release and HACS custom-repository flow above. It is being validated
-through a clean Home Assistant installation before the first stable `v0.16.0`
-release. The beta is not a stable or production recommendation, and later beta
-builds may require upgrade testing. See the
-[v0.16.0-beta.1 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.16.0-beta.1)
+Version `v0.16.0` is the first stable public release and is available through
+the GitHub release and HACS custom-repository flow above. It passed the
+documented clean-install and Home Assistant Lab acceptance gates. See the
+[v0.16.0 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.16.0)
 and [release process](docs/RELEASE_PROCESS.md) for details.
 
 - [User guide](docs/USER_GUIDE.md)
@@ -259,6 +257,7 @@ and [release process](docs/RELEASE_PROCESS.md) for details.
 - [Automation examples](docs/AUTOMATION_EXAMPLES.md)
 - [Development and testing](docs/DEVELOPMENT.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [MeshMonitor API coverage and roadmap](docs/API_COVERAGE.md)
 - [Privacy and threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Contributing](CONTRIBUTING.md)
 - [Support](SUPPORT.md)
