@@ -1,4 +1,8 @@
-# Screenshot provenance
+# Screenshot notes for contributors
+
+This page records how the documentation screenshots were made and what to
+check before replacing them. The screenshots use made-up mesh data so the
+documentation does not expose a real network.
 
 The four panel screenshots in this directory use the integration's real
 frontend with a hand-written fictional data set. They show 28 fictional nodes,

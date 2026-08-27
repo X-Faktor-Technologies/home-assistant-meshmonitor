@@ -1,10 +1,12 @@
 # Architecture and data flow
 
-This document describes the runtime ownership, trust boundaries, and request
-paths of MeshMonitor for Home Assistant. The central product boundary is that
-Home Assistant is the daily mesh console while MeshMonitor remains the source
-of truth for sources, radios, configuration, credentials, and technical
-administration.
+This page is for developers who want to understand how the integration works
+internally. In short: Home Assistant is the everyday mesh dashboard, while
+MeshMonitor remains responsible for radios, sources, settings, credentials,
+and server administration.
+
+The sections below explain where information is stored, when requests happen,
+and which safety boundaries must not be removed.
 
 ## Design invariants
 

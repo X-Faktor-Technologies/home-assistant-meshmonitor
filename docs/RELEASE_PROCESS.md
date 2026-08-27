@@ -1,6 +1,10 @@
 # Release process
 
-This guide separates publishing the source repositories from publishing the
+This checklist is for maintainers preparing a release. It is intentionally
+strict because a release can affect credentials, stored mesh information, and
+radio activity. Regular users do not need to follow these steps.
+
+The guide separates publishing the source repositories from publishing the
 Python client, creating a Home Assistant/HACS release, and promoting the
 integration beyond the lab. Each stage has its own approval and verification
 gate. Completing one stage does not authorize the next.

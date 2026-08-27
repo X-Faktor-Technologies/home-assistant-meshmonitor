@@ -1,11 +1,14 @@
 # Troubleshooting MeshMonitor
 
-Start with the source card on the MeshMonitor **Overview** page. Note whether
-the source is connected, when it last updated, and whether the card names a
-permission or optional-data problem.
+Start on the MeshMonitor **Overview** page. Find the source with the problem and
+check three things: is it connected, when did it last update, and does the card
+mention a missing permission or unavailable feature?
 
-Then check the same source in MeshMonitor itself. Home Assistant cannot repair
-a stopped radio, disconnected source, expired token, or unreachable server.
+Next, check the same source in MeshMonitor itself. If it is broken there too,
+fix MeshMonitor, the radio, or the network connection first.
+
+Find the heading below that best matches what you see. Try the steps in order
+and stop when the problem is fixed.
 
 ## MeshMonitor is not listed in Home Assistant
 
@@ -19,8 +22,8 @@ then check **Settings → System → Logs** for an import or manifest error.
 
 ## Home Assistant cannot connect
 
-Use the MeshMonitor address that the Home Assistant host or container can
-reach. An address that works on your laptop may not work from Home Assistant.
+Use an address that the Home Assistant machine or container can reach. An
+address that works on your laptop may still be unreachable from Home Assistant.
 
 Check:
 
@@ -53,7 +56,8 @@ source that is temporarily offline or hidden.
 
 ## Setup says node visibility is required
 
-This usually means the API user can see the source but not its nodes.
+This usually means the API user can see the source, but does not have permission
+to see its nodes.
 
 For Meshtastic:
 
@@ -86,13 +90,14 @@ After a temporary outage, wait for one configured polling interval. Reload the
 integration once only if MeshMonitor is healthy and the source still does not
 recover.
 
-Missing entities are not always an error. MeshMonitor creates only the sensors
-for values the radio actually reports.
+Missing entities are not always a problem. The integration creates only the
+sensors for values the radio actually reports. For example, a radio that never
+reports voltage will not get a voltage sensor.
 
 ## Counts differ from MeshMonitor
 
-The integration sees only what its API user is allowed to see. Compare the
-user's source and channel access first.
+Home Assistant sees only what the MeshMonitor API user is allowed to see. Check
+that user's source and channel access first.
 
 “Known,” “active,” and “heard recently” can also use different time windows.
 Compare the labels and definitions before assuming nodes were lost.
@@ -122,9 +127,9 @@ requests. Nodes and saved links can still work in tile-free mode.
 
 ## A topology or neighbor layer has no links
 
-A saved link can be drawn only when MeshMonitor has the relationship and both
-nodes have current positions. A successful empty result simply means there are
-no saved links to show.
+A link can be drawn only when MeshMonitor knows about the relationship and both
+nodes have positions. If the layer is empty without an error, MeshMonitor has
+no matching saved links to show.
 
 Turning these layers on reads saved information. It does not send a traceroute
 or another radio request.
@@ -147,8 +152,8 @@ still collected; muting changes only the current browser view.
 
 ## No message event is fired
 
-The first successful message update records existing history without firing
-events. Test with a new incoming message after that first update.
+The first update quietly records messages that already exist. It does not fire
+events for them. Test with a new incoming message after that first update.
 
 Outgoing messages do not fire `meshmonitor_message_received`. Direct-message
 direction is known only when the recipient matches a local node from a loaded
@@ -156,8 +161,8 @@ source.
 
 ## Message text is missing from an event
 
-This is the default privacy setting. Enable **Expose message text in events**
-only if the automation really needs it.
+This is the normal privacy setting, not an error. Enable **Expose message text
+in events** only when the automation truly needs the message body.
 
 Remember that Home Assistant automation traces, logs, notifications, and TTS
 services may retain the message after it leaves MeshMonitor.
@@ -184,7 +189,7 @@ Sending needs:
 A rate-limit response is intentional. Wait and try again manually. If a
 timeout makes the result uncertain, check the conversation before resending.
 
-## Understanding status words
+## What the status words mean
 
 - **Empty** means the request worked but MeshMonitor had no saved records.
 - **Unavailable** means this server or source does not provide that feature.
@@ -192,10 +197,10 @@ timeout makes the result uncertain, check the conversation before resending.
 - **Error** means the request should be supported but failed.
 - **Out of date** means the last successful information is older than expected.
 
-Granting more permissions will not create records that MeshMonitor has never
-stored.
+More permissions cannot create information that MeshMonitor never received or
+saved.
 
-## Collect information safely
+## What to include when asking for help
 
 When filing an issue, include:
 

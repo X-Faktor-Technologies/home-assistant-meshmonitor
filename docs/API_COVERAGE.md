@@ -1,15 +1,16 @@
 # MeshMonitor API coverage and roadmap
 
-This is the living compatibility map for MeshMonitor for Home Assistant. It
-records the supported server contract, the typed Python-client boundary, the
-Home Assistant exposure, and capabilities that are intentionally omitted.
+This page is mainly for maintainers and contributors. It answers three
+questions: which MeshMonitor features are supported, which permissions they
+need, and which features intentionally stay in MeshMonitor instead of Home
+Assistant.
 
 The matrix was last audited on 2026-08-26 against MeshMonitor 4.15.1, the
 current stable upstream release. The integration supports MeshMonitor 4.14.x
 and 4.15.x. Upstream `main` is monitored for compatibility planning but is
 not a supported contract until those changes appear in a stable release.
 
-## Classification
+## What the operation types mean
 
 - **Read** does not change MeshMonitor or transmit over the mesh.
 - **Metadata write** changes stored MeshMonitor state without transmitting.
