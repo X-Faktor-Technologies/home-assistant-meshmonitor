@@ -1197,6 +1197,7 @@ async def websocket_set_favorite(
         return
     await entry.coordinator.async_request_refresh()
     from . import server_options
+    from .entity_policy import async_reconcile_node_registries
 
     if (
         server_options(entry.entry).get(
@@ -1204,7 +1205,9 @@ async def websocket_set_favorite(
         )
         == NODE_DEVICE_POLICY_FAVORITES
     ):
-        await hass.config_entries.async_reload(entry.entry_id)
+        async_reconcile_node_registries(
+            hass, entry.entry, source_ids={entry.source_id}
+        )
     connection.send_result(msg["id"], {"favorite": msg["favorite"]})
 
 

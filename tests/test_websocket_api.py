@@ -745,7 +745,7 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unfavorite_refreshes_source_and_reloads_favorites_policy() -> None:
+async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> None:
     client = Mock()
     client.set_meshtastic_favorite = AsyncMock(return_value=None)
     coordinator = SimpleNamespace(async_request_refresh=AsyncMock())
@@ -773,17 +773,26 @@ async def test_unfavorite_refreshes_source_and_reloads_favorites_policy() -> Non
     hass.config_entries.async_reload = AsyncMock(return_value=True)
     connection = Mock()
 
-    await _raw_favorite_handler()(
-        hass,
-        connection,
-        {"id": 8, "source_id": "source-1", "node_id": "remote", "favorite": False},
-    )
+    with patch(
+        "custom_components.meshmonitor.entity_policy.async_reconcile_node_registries"
+    ) as reconcile:
+        await _raw_favorite_handler()(
+            hass,
+            connection,
+            {
+                "id": 8,
+                "source_id": "source-1",
+                "node_id": "remote",
+                "favorite": False,
+            },
+        )
 
     client.set_meshtastic_favorite.assert_awaited_once_with(
         "source-1", "remote", False
     )
     coordinator.async_request_refresh.assert_awaited_once_with()
-    hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+    reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
+    hass.config_entries.async_reload.assert_not_awaited()
     connection.send_result.assert_called_once_with(8, {"favorite": False})
 
 

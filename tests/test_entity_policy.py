@@ -31,7 +31,8 @@ def _source(policy: str | None, local_node_id: str = "!000004d2") -> SimpleNames
     return SimpleNamespace(
         entry=SimpleNamespace(options={CONF_SERVER_OPTIONS: server}),
         coordinator=SimpleNamespace(
-            data=SimpleNamespace(status=SimpleNamespace(local_node_id=local_node_id))
+            data=SimpleNamespace(status=SimpleNamespace(local_node_id=local_node_id)),
+            last_update_success=True,
         ),
     )
 
@@ -87,6 +88,11 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
         "favorite": _node("favorite", favorite=True),
         "ordinary": _node("ordinary"),
     }
+    other_source = _source(NODE_DEVICE_POLICY_FAVORITES)
+    other_source.source_id = "source-b"
+    other_source.coordinator.nodes = {
+        "new-identity": _node("new-identity", favorite=True)
+    }
     entry = MockConfigEntry(
         domain="meshmonitor",
         entry_id=entry_id,
@@ -95,13 +101,15 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = SimpleNamespace(
-        fingerprint=fingerprint, sources={source.source_id: source}
+        fingerprint=fingerprint,
+        sources={source.source_id: source, other_source.source_id: other_source},
     )
     source.entry = entry
+    other_source.entry = entry
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     created = {}
-    for node_id in source.coordinator.nodes:
+    for node_id in (*source.coordinator.nodes, "deleted"):
         device = devices.async_get_or_create(
             config_entry_id=entry_id,
             identifiers={node_device_identifier(fingerprint, source.source_id, node_id)},
@@ -120,14 +128,47 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
     foreign = devices.async_get_or_create(
         config_entry_id="other-entry", identifiers={("other", "device")}
     )
+    other_source_device = devices.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={node_device_identifier(fingerprint, "source-b", "new-identity")},
+        name="xMesh-01",
+    )
 
     plan = registry_reconciliation_plan(hass, entry)
-    assert plan.device_ids == {created["ordinary"]}
-    assert len(plan.entity_ids) == 1
+    assert plan.device_ids == {created["ordinary"], created["deleted"]}
+    assert len(plan.entity_ids) == 2
 
     result = async_reconcile_node_registries(hass, entry)
     assert result == plan
     assert devices.async_get(created["ordinary"]) is None
+    assert devices.async_get(created["deleted"]) is None
     assert devices.async_get(created["local"]) is not None
     assert devices.async_get(created["favorite"]) is not None
+    assert devices.async_get(other_source_device.id) is not None
     assert devices.async_get(foreign.id) is not None
+
+
+async def test_reconciliation_preserves_orphans_after_failed_snapshot(hass) -> None:
+    """A failed refresh cannot be interpreted as authoritative deletion."""
+    entry_id = "entry"
+    fingerprint = "fingerprint"
+    source = _source(NODE_DEVICE_POLICY_FAVORITES)
+    source.source_id = "source-a"
+    source.coordinator.last_update_success = False
+    source.coordinator.nodes = {}
+    entry = MockConfigEntry(domain="meshmonitor", entry_id=entry_id, data={})
+    entry.add_to_hass(hass)
+    entry.runtime_data = SimpleNamespace(
+        fingerprint=fingerprint, sources={source.source_id: source}
+    )
+    source.entry = entry
+    devices = dr.async_get(hass)
+    device = devices.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={node_device_identifier(fingerprint, source.source_id, "missing")},
+    )
+
+    plan = registry_reconciliation_plan(hass, entry)
+
+    assert plan.device_ids == frozenset()
+    assert devices.async_get(device.id) is not None
