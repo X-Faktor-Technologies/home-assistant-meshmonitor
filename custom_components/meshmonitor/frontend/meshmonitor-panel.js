@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0846";
+} from "./map-view.js?v=20260829-0853";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -269,6 +269,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   async _load() {
     if (!this._hass || this._loading) return;
+    const refreshMapInPlace = this._tab === "map" && Boolean(this._mapInstance);
     this._loading = true;
     if (!this._data) this._render();
     try {
@@ -282,7 +283,8 @@ class MeshMonitorPanel extends HTMLElement {
       this._error = error?.message || String(error);
     } finally {
       this._loading = false;
-      this._render();
+      if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
+      else this._render();
     }
   }
 
@@ -562,13 +564,16 @@ class MeshMonitorPanel extends HTMLElement {
         .leaflet-container { color:#dce7ed; font:14px system-ui,sans-serif; }
         .leaflet-bar { overflow:hidden; border:1px solid #ffffff24!important; border-radius:10px!important; box-shadow:0 4px 14px #0008!important; }
         .leaflet-bar a,.leaflet-bar a:hover { border-color:#ffffff14!important; background:#101c24!important; color:#e9f2f6!important; }
-        .map .leaflet-popup-content-wrapper,.map .leaflet-popup-tip { background:#142129; color:#e7eff3; }
-        .map .leaflet-popup-content-wrapper { border:1px solid #ffffff1f; border-radius:12px; box-shadow:0 7px 26px #000a; }
-        .map .leaflet-popup-content { min-width:210px; line-height:1.45; }
-        .map .leaflet-popup-content p { margin:9px 0; }
-        .map .leaflet-popup-content a { color:#65c8fa; font-weight:650; }
-        .map .leaflet-popup-content button { border:1px solid #ffffff20; border-radius:9px; background:#20313c; }
-        .map .leaflet-popup-close-button { color:#c7d5dc!important; }
+        .map .leaflet-popup-content-wrapper,.map .leaflet-popup-tip { background:var(--card-background-color); color:var(--primary-text-color); }
+        .map .leaflet-popup-content-wrapper { border:1px solid var(--divider-color); border-radius:14px; box-shadow:var(--ha-card-box-shadow,0 7px 26px #0005); }
+        .map .leaflet-popup-content { width:min(290px,calc(100vw - 74px))!important; min-width:0; margin:17px 18px 16px; line-height:1.45; overflow-wrap:anywhere; }
+        .map .leaflet-popup-content p { margin:10px 0; }
+        .map .leaflet-popup-content a { color:var(--primary-color); font-weight:650; }
+        .map-popup-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin-top:13px; }
+        .map-popup-actions button,.map-popup-actions a { min-width:0; min-height:39px; display:flex; align-items:center; justify-content:center; margin:0; padding:8px 10px; border:1px solid var(--divider-color); border-radius:9px; background:var(--secondary-background-color); color:var(--primary-text-color); text-align:center; text-decoration:none; line-height:1.25; }
+        .map-popup-actions button:hover:not(:disabled),.map-popup-actions a:hover { border-color:color-mix(in srgb,var(--primary-color) 55%,var(--divider-color)); background:color-mix(in srgb,var(--secondary-background-color) 88%,var(--primary-color)); }
+        .map-popup-actions button:disabled { color:var(--disabled-text-color,var(--secondary-text-color)); background:var(--disabled-color,var(--secondary-background-color)); opacity:.62; }
+        .map .leaflet-popup-close-button { width:34px; height:34px; color:var(--secondary-text-color)!important; font-size:23px; }
         .map .leaflet-tooltip { border:1px solid #ffffff24; border-radius:8px; background:#101b22; color:#e5eef2; box-shadow:0 4px 16px #0009; }
         .leaflet-tooltip-top::before { border-top-color:#101b22; }
         .leaflet-control-attribution { border-radius:7px 0 0; background:#0b151dcc!important; color:#b7c4cb; font-size:10px; }
@@ -1717,9 +1722,54 @@ class MeshMonitorPanel extends HTMLElement {
     map.on("zoomend", () => this._renderMapMarkers());
   }
 
+  _refreshMapSnapshot() {
+    const map = this._mapInstance;
+    if (!map) return;
+    const positioned = this._allMapNodes().filter(
+      (node) => node.latitude != null && node.longitude != null,
+    );
+    const nextNodes = this._filteredMapNodes(positioned);
+    const nextLinks = this._mapLinks();
+    const nodeSignature = (nodes) => JSON.stringify(nodes.map((node) => ({
+      entry_id: node.entry_id,
+      source_id: node.source_id,
+      id: node.id,
+      name: node.name,
+      protocol: node.protocol,
+      latitude: node.latitude,
+      longitude: node.longitude,
+      device_id: node.device_id,
+      battery: node.battery,
+      voltage: node.voltage,
+      rssi: node.rssi,
+      snr: node.snr,
+      activity: nodeActivity(node),
+      freshness: this._freshness(node),
+    })));
+    const nodesChanged = nodeSignature(this._mapNodes || []) !== nodeSignature(nextNodes);
+    const linksChanged = JSON.stringify(this._mapLinksVisible || []) !== JSON.stringify(nextLinks);
+    this._mapNodes = nextNodes;
+    this._mapLinksVisible = nextLinks;
+    if (linksChanged) this._renderMapLinks();
+    if (nodesChanged) this._renderMapMarkers();
+    const count = this.shadowRoot?.querySelector(".map-stat");
+    if (count)
+      count.textContent = mapCountLabel(
+        nextNodes.length,
+        nextLinks.length,
+        this._visiblePositionTrail()?.fixes?.length || 0,
+      );
+    const statuses = this.shadowRoot?.querySelector(".map-layer-status");
+    if (statuses) {
+      const trailBad = this._positionTrail?.state === "error";
+      statuses.innerHTML = `${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span>`;
+    }
+  }
+
   _renderMapLinks() {
     const map = this._mapInstance;
     if (!map) return;
+    if (this._mapLinkLayer) this._mapLinkLayer.remove();
     this._mapLinkLayer = window.L.layerGroup().addTo(map);
     for (const link of this._mapLinksVisible || []) {
       const topology = link.kind === "topology";
@@ -1736,6 +1786,7 @@ class MeshMonitorPanel extends HTMLElement {
   _renderMapMarkers() {
     const map = this._mapInstance;
     if (!map) return;
+    const openNodeKey = this._openMapNodeKey;
     if (this._mapLayer) this._mapLayer.remove();
     this._mapLayer = window.L.layerGroup().addTo(map);
     const zoom = map.getZoom();
@@ -1794,7 +1845,7 @@ class MeshMonitorPanel extends HTMLElement {
             ? `${node.snr} dB`
             : "—";
       const link = node.device_id
-        ? `<p><a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open Home Assistant device</a></p>`
+        ? `<a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open HA device</a>`
         : "";
       const nodeDetail = this._allNodes().some(
         (item) =>
@@ -1802,21 +1853,28 @@ class MeshMonitorPanel extends HTMLElement {
           item.source_id === node.source_id &&
           item.id === node.id,
       )
-        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button></p>`
+        ? `<button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button>`
         : "";
       const trail = node.protocol === "meshtastic"
-        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button></p>`
+        ? `<button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button>`
         : "";
       const activity = nodeActivity(node);
+      const nodeKey = `${node.entry_id}\u0000${node.source_id}\u0000${node.id}`;
       marker.bindPopup(
-        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${nodeDetail}`,
+        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail || link || nodeDetail ? `<div class="map-popup-actions">${trail}${link}${nodeDetail}</div>` : ""}`,
       );
+      marker.on("popupopen", () => { this._openMapNodeKey = nodeKey; });
+      marker.on("popupclose", () => {
+        if (this._openMapNodeKey === nodeKey) this._openMapNodeKey = null;
+      });
       if (
         this._mapFocusNode ===
-        `${node.entry_id}\u0000${node.source_id}\u0000${node.id}`
+        nodeKey
       ) {
         marker.openPopup();
         this._mapFocusNode = null;
+      } else if (openNodeKey === nodeKey) {
+        marker.openPopup();
       }
     }
   }
@@ -2859,7 +2917,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0846")) {
-  customElements.define("meshmonitor-panel-20260829-0846", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0853")) {
+  customElements.define("meshmonitor-panel-20260829-0853", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

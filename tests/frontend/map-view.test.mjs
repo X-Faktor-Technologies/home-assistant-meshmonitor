@@ -199,3 +199,29 @@ test("map node popup opens the matching panel node details instead of MeshMonito
   assert.match(panel, /_nodeDetailFromMap\(/);
   assert.doesNotMatch(panel, /Open source nodes in MeshMonitor/);
 });
+
+test("map popups use HA theme surfaces and responsive action layout", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /leaflet-popup-content-wrapper[^}]*background:var\(--card-background-color\)/);
+  assert.match(panel, /leaflet-popup-content-wrapper[^}]*color:var\(--primary-text-color\)/);
+  assert.match(panel, /\.map-popup-actions \{[^}]*repeat\(auto-fit,minmax\(120px,1fr\)\)/);
+  assert.match(panel, /\.map-popup-actions button,.map-popup-actions a \{[^}]*background:var\(--secondary-background-color\)/);
+  assert.doesNotMatch(panel, /leaflet-popup-content-wrapper[^}]*background:#142129/);
+});
+
+test("scheduled map refresh updates layers in place without rebuilding Leaflet", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /refreshMapInPlace = this\._tab === "map" && Boolean\(this\._mapInstance\)/);
+  assert.match(panel, /if \(refreshMapInPlace && this\._mapInstance\) this\._refreshMapSnapshot\(\)/);
+  assert.match(panel, /_refreshMapSnapshot\(\) \{[\s\S]*this\._renderMapLinks\(\);[\s\S]*this\._renderMapMarkers\(\);/);
+  assert.match(panel, /const openNodeKey = this\._openMapNodeKey/);
+  assert.match(panel, /else if \(openNodeKey === nodeKey\)/);
+});
