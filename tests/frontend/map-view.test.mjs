@@ -172,6 +172,20 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.doesNotMatch(panel, /\.map-home-marker \{[^}]*background:var\(--primary-color\)/);
 });
 
+test("map controls use theme-neutral surfaces and balanced mobile grids", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /\.map-head \{[^}]*background:var\(--card-background-color\)/);
+  assert.match(panel, /\.map-toolbar \{[^}]*background:color-mix\(in srgb,var\(--secondary-background-color\) 46%,var\(--card-background-color\)\)/);
+  assert.match(panel, /\.map-toolbar button\.active \{[^}]*var\(--primary-color\) 18%,var\(--card-background-color\)/);
+  assert.match(panel, /\.map-control-group\.layers\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/);
+  assert.match(panel, /\.map-control-group\.layers #map-show-home\{grid-column:1\/-1\}/);
+  assert.match(panel, /\.map-control-group\.view\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) 44px minmax\(110px,1\.25fr\)\}/);
+});
+
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {
   const panel = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
