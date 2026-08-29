@@ -57,6 +57,20 @@ def async_add_node_entities(
     )
 
 
+async def async_wait_node_entity_removals(
+    hass: HomeAssistant, unique_id_prefix: str
+) -> None:
+    """Wait for one node's active platform entities to finish retiring."""
+    removals: dict[str, asyncio.Task[None]] = hass.data.setdefault(DOMAIN, {}).setdefault(
+        _NODE_ENTITY_REMOVALS, {}
+    )
+    pending = tuple(
+        task for unique_id, task in removals.items() if unique_id.startswith(unique_id_prefix)
+    )
+    if pending:
+        await asyncio.gather(*pending)
+
+
 def source_device_info(source: MeshMonitorSourceRuntime) -> DeviceInfo:
     """Build device registry information for a MeshMonitor source."""
     fingerprint = server_fingerprint(source.data["url"])

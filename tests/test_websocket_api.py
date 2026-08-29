@@ -767,7 +767,9 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
         "Source",
         "meshtastic",
     )
-    server_entry.runtime_data = SimpleNamespace(sources={"source-1": source})
+    server_entry.runtime_data = SimpleNamespace(
+        fingerprint="fingerprint", sources={"source-1": source}
+    )
     hass = Mock()
     hass.config_entries.async_loaded_entries.return_value = [server_entry]
     hass.config_entries.async_reload = AsyncMock(return_value=True)
@@ -775,7 +777,10 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
 
     with patch(
         "custom_components.meshmonitor.entity_policy.async_reconcile_node_registries"
-    ) as reconcile:
+    ) as reconcile, patch(
+        "custom_components.meshmonitor.entity.async_wait_node_entity_removals",
+        new=AsyncMock(),
+    ) as wait_for_removal:
         await _raw_favorite_handler()(
             hass,
             connection,
@@ -792,6 +797,10 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
     )
     coordinator.async_request_refresh.assert_awaited_once_with()
     reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
+    wait_for_removal.assert_awaited_once_with(
+        hass,
+        "node:fingerprint:source-1:remote:",
+    )
     hass.config_entries.async_reload.assert_not_awaited()
     connection.send_result.assert_called_once_with(8, {"favorite": False})
 
