@@ -1,4 +1,5 @@
 export const MAP_STYLE_STORAGE = "meshmonitor.map.style";
+export const MAP_SHOW_HOME_STORAGE = "meshmonitor.map.showHome";
 export const MAP_STYLES = Object.freeze([
   Object.freeze({ value: "standard", label: "Standard" }),
   Object.freeze({ value: "neutral-dark", label: "Neutral dark" }),
@@ -6,6 +7,41 @@ export const MAP_STYLES = Object.freeze([
 ]);
 
 const MAP_STYLE_VALUES = new Set(MAP_STYLES.map(({ value }) => value));
+
+export const nodeIsVisibleOnMap = (node) => node?.hidden_from_map !== true;
+
+export const readShowHome = (storage) =>
+  storage.getItem(MAP_SHOW_HOME_STORAGE) === "true";
+
+export const persistShowHome = (storage, value) => {
+  const visible = value === true;
+  storage.setItem(MAP_SHOW_HOME_STORAGE, String(visible));
+  return visible;
+};
+
+export const homeLocation = (hass) => {
+  const zone = hass?.states?.["zone.home"];
+  const latitude = Number(
+    zone?.attributes?.latitude ?? hass?.config?.latitude,
+  );
+  const longitude = Number(
+    zone?.attributes?.longitude ?? hass?.config?.longitude,
+  );
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  )
+    return null;
+  return {
+    latitude,
+    longitude,
+    name: zone?.attributes?.friendly_name || "Home",
+  };
+};
 
 export const normalizeMapStyle = (value, legacyPrivacy = null) => {
   if (MAP_STYLE_VALUES.has(value)) return value;

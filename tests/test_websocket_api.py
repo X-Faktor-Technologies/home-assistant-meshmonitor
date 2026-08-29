@@ -364,6 +364,7 @@ def test_panel_payload_is_bounded_and_contains_no_credentials() -> None:
             "latitude": 27.9,
             "longitude": -82.5,
             "altitude": 14.25,
+            "hideFromMap": True,
             "secret": "must-not-leak",
         }
     )
@@ -423,10 +424,11 @@ def test_panel_payload_is_bounded_and_contains_no_credentials() -> None:
     payload = _serialize_entry(entry)
     rendered = repr(payload)
     assert payload["node_count"] == 1
-    assert payload["positioned_count"] == 1
+    assert payload["positioned_count"] == 0
     assert payload["stale_after_seconds"] == 300
     assert payload["nodes"][0]["name"] == "Test Node"
     assert payload["nodes"][0]["altitude"] == 14.25
+    assert payload["nodes"][0]["hidden_from_map"] is True
     assert payload["topology"]["state"] == "supported"
     assert payload["topology"]["edges"] == [
         {"from_id": "42", "to_id": "43", "route": [42, 43], "snr": [8.25]}

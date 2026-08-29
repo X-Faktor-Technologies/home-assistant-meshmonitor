@@ -28,13 +28,17 @@ import {
 } from "./automation-view.js";
 import {
   MAP_STYLES,
+  homeLocation,
   mapCountLabel,
   mapEmptyPresentation,
   mapLayerSummary,
   mapStylePresentation,
+  nodeIsVisibleOnMap,
   persistMapStyle,
+  persistShowHome,
   readMapStyle,
-} from "./map-view.js";
+  readShowHome,
+} from "./map-view.js?v=20260829-0853";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -169,6 +173,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._mapSource = "all";
       this._mapFreshness = "all";
       this._mapStyle = readMapStyle(localStorage);
+      this._mapShowHome = readShowHome(localStorage);
       this._mapTopology =
         localStorage.getItem("meshmonitor.map.topology") !== "false";
       this._mapNeighbors =
@@ -264,6 +269,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   async _load() {
     if (!this._hass || this._loading) return;
+    const refreshMapInPlace = this._tab === "map" && Boolean(this._mapInstance);
     this._loading = true;
     if (!this._data) this._render();
     try {
@@ -277,7 +283,8 @@ class MeshMonitorPanel extends HTMLElement {
       this._error = error?.message || String(error);
     } finally {
       this._loading = false;
-      this._render();
+      if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
+      else this._render();
     }
   }
 
@@ -287,7 +294,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _allMapNodes() {
     return (this._data?.sources || []).flatMap((source) => [
-      ...(source.nodes || []),
+      ...(source.nodes || []).filter(nodeIsVisibleOnMap),
       ...(source.protocol === "reticulum"
         ? (source.reticulum?.peers || []).map((peer) => ({
             ...peer,
@@ -530,13 +537,13 @@ class MeshMonitorPanel extends HTMLElement {
         .automation-more summary { width:max-content; max-width:100%; padding:6px 0; color:var(--primary-color); cursor:pointer; font-size:11px; font-weight:650; }
         .automation-more summary:focus-visible { outline:2px solid var(--primary-color); outline-offset:3px; }
         .map-shell { position:relative; overflow:hidden; border:1px solid var(--divider-color); border-radius:16px; background:var(--card-background-color); box-shadow:var(--ha-card-box-shadow,0 2px 5px #0002); }
-        .map-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 16px 12px; background:color-mix(in srgb,var(--card-background-color) 94%,var(--primary-color)); }
+        .map-head { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 16px 12px; background:var(--card-background-color); }
         .map-head h2 { margin:0; font-size:18px; }
         .map-head p { margin:3px 0 0; font-size:12px; }
         .map-shell:fullscreen { display:flex; flex-direction:column; width:100vw; height:100vh; border:0; border-radius:0; background:var(--primary-background-color); }
         .map-shell:fullscreen .map-canvas { flex:1; min-height:0; }
         .map-shell:fullscreen .map { height:100%; }
-        .map-toolbar { display:grid; grid-template-columns:minmax(400px,1.4fr) auto minmax(260px,auto); gap:10px 18px; align-items:end; padding:13px 14px; border-bottom:1px solid var(--divider-color); background:color-mix(in srgb,var(--card-background-color) 88%,var(--primary-color)); }
+        .map-toolbar { display:grid; grid-template-columns:minmax(400px,1.4fr) auto minmax(260px,auto); gap:10px 18px; align-items:end; padding:13px 14px; border-bottom:1px solid var(--divider-color); background:color-mix(in srgb,var(--secondary-background-color) 46%,var(--card-background-color)); }
         .map-control-row { display:flex; align-items:center; gap:15px; }
         .map-control-group { min-width:0; display:flex; align-items:center; gap:7px; }
         .map-control-group.filters select { flex:1; min-width:0; }
@@ -545,7 +552,8 @@ class MeshMonitorPanel extends HTMLElement {
         .map-toolbar button:hover,.map-toolbar button:focus-visible,.map-toolbar select:hover,.map-toolbar select:focus-visible { border-color:color-mix(in srgb,var(--primary-color) 55%,var(--divider-color)); background:color-mix(in srgb,var(--secondary-background-color) 88%,var(--primary-color)); }
         .map-toolbar button { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
         .map-toolbar ha-icon { --mdc-icon-size:18px; }
-        .map-toolbar button.active { border-color:color-mix(in srgb,var(--primary-color) 68%,white); background:color-mix(in srgb,var(--primary-color) 78%,#14212a); }
+        .map-toolbar button.active { border-color:color-mix(in srgb,var(--primary-color) 68%,var(--divider-color)); background:color-mix(in srgb,var(--primary-color) 18%,var(--card-background-color)); color:var(--primary-text-color); font-weight:650; }
+        .map-toolbar button.active ha-icon { color:var(--primary-color); }
         .map-toolbar .map-icon-button { min-width:39px; padding-left:10px; padding-right:10px; }
         .map-toolbar input[type="range"] { width:110px; margin:0; padding:0; border:0; accent-color:var(--primary-color); }
         .map-canvas { position:relative; background:#081016; }
@@ -556,13 +564,16 @@ class MeshMonitorPanel extends HTMLElement {
         .leaflet-container { color:#dce7ed; font:14px system-ui,sans-serif; }
         .leaflet-bar { overflow:hidden; border:1px solid #ffffff24!important; border-radius:10px!important; box-shadow:0 4px 14px #0008!important; }
         .leaflet-bar a,.leaflet-bar a:hover { border-color:#ffffff14!important; background:#101c24!important; color:#e9f2f6!important; }
-        .map .leaflet-popup-content-wrapper,.map .leaflet-popup-tip { background:#142129; color:#e7eff3; }
-        .map .leaflet-popup-content-wrapper { border:1px solid #ffffff1f; border-radius:12px; box-shadow:0 7px 26px #000a; }
-        .map .leaflet-popup-content { min-width:210px; line-height:1.45; }
-        .map .leaflet-popup-content p { margin:9px 0; }
-        .map .leaflet-popup-content a { color:#65c8fa; font-weight:650; }
-        .map .leaflet-popup-content button { border:1px solid #ffffff20; border-radius:9px; background:#20313c; }
-        .map .leaflet-popup-close-button { color:#c7d5dc!important; }
+        .map .leaflet-popup-content-wrapper,.map .leaflet-popup-tip { background:var(--card-background-color); color:var(--primary-text-color); }
+        .map .leaflet-popup-content-wrapper { border:1px solid var(--divider-color); border-radius:14px; box-shadow:var(--ha-card-box-shadow,0 7px 26px #0005); }
+        .map .leaflet-popup-content { width:min(290px,calc(100vw - 74px))!important; min-width:0; margin:17px 18px 16px; line-height:1.45; overflow-wrap:anywhere; }
+        .map .leaflet-popup-content p { margin:10px 0; }
+        .map .leaflet-popup-content a { color:var(--primary-color); font-weight:650; }
+        .map-popup-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin-top:13px; }
+        .map-popup-actions button,.map-popup-actions a { min-width:0; min-height:39px; display:flex; align-items:center; justify-content:center; margin:0; padding:8px 10px; border:1px solid var(--divider-color); border-radius:9px; background:var(--secondary-background-color); color:var(--primary-text-color); text-align:center; text-decoration:none; line-height:1.25; }
+        .map-popup-actions button:hover:not(:disabled),.map-popup-actions a:hover { border-color:color-mix(in srgb,var(--primary-color) 55%,var(--divider-color)); background:color-mix(in srgb,var(--secondary-background-color) 88%,var(--primary-color)); }
+        .map-popup-actions button:disabled { color:var(--disabled-text-color,var(--secondary-text-color)); background:var(--disabled-color,var(--secondary-background-color)); opacity:.62; }
+        .map .leaflet-popup-close-button { width:34px; height:34px; color:var(--secondary-text-color)!important; font-size:23px; }
         .map .leaflet-tooltip { border:1px solid #ffffff24; border-radius:8px; background:#101b22; color:#e5eef2; box-shadow:0 4px 16px #0009; }
         .leaflet-tooltip-top::before { border-top-color:#101b22; }
         .leaflet-control-attribution { border-radius:7px 0 0; background:#0b151dcc!important; color:#b7c4cb; font-size:10px; }
@@ -570,6 +581,8 @@ class MeshMonitorPanel extends HTMLElement {
         .map-marker { width:19px; height:19px; border:2px solid #effbff; border-radius:50%; box-shadow:0 0 0 3px #061017cc,0 0 13px currentColor; }
         .map-marker.meshtastic { background:var(--protocol-meshtastic); color:var(--protocol-meshtastic); } .map-marker.meshcore { background:var(--protocol-meshcore); color:var(--protocol-meshcore); } .map-marker.reticulum { background:var(--protocol-reticulum); color:var(--protocol-reticulum); }
         .map-marker.stale { opacity:.72; } .map-marker.old { opacity:.52; filter:grayscale(.55); }
+        .map-home-marker { width:34px; height:34px; display:grid; place-items:center; color:#1c1c1c; background:var(--warning-color,#ff9800); border:3px solid white; border-radius:50%; box-shadow:0 2px 10px #0009; }
+        .map-home-marker ha-icon { --mdc-icon-size:21px; }
         .map-cluster { display:flex; align-items:center; justify-content:center; width:38px; height:38px; border:2px solid #dff6ff; border-radius:50%; background:linear-gradient(145deg,#2187bd,#125174); color:#fff; font-weight:800; box-shadow:0 0 0 3px #061017cc,0 4px 15px #000a; }
         .map-state { position:absolute; inset:0; z-index:1; display:grid; place-items:center; padding:32px; text-align:center; }
         .map-state>div { max-width:480px; padding:24px 26px; border:1px solid #ffffff1c; border-radius:14px; background:#0b151de8; box-shadow:0 10px 35px #0008; }
@@ -577,7 +590,7 @@ class MeshMonitorPanel extends HTMLElement {
         .map-state.failed .map-state-label { color:var(--error-color,#ef5350); }
         .map-state h2 { margin:7px 0 8px; font-size:21px; }
         .map-state p { margin:0; line-height:1.5; }
-        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; background:color-mix(in srgb,var(--card-background-color) 96%,var(--primary-color)); }
+        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; background:var(--card-background-color); }
         .map-legend { display:flex; align-items:center; gap:7px 14px; flex-wrap:wrap; }
         .map-legend-item { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:12px; }
         .legend-dot { width:9px; height:9px; border-radius:50%; background:currentColor; box-shadow:0 0 0 2px color-mix(in srgb,currentColor 22%,transparent); }
@@ -778,7 +791,7 @@ class MeshMonitorPanel extends HTMLElement {
         .reply-state { flex:none; padding:5px 8px; border:1px solid var(--divider-color); border-radius:999px; background:var(--secondary-background-color); font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
         @media(max-width:1100px){.map-toolbar{grid-template-columns:minmax(0,1fr) auto}.map-control-group.filters{grid-column:1/-1}.map-control-group.history{justify-self:end}.conversation-head{align-items:flex-start;flex-wrap:wrap}.conversation-actions{flex:1 1 100%;justify-content:flex-start}.automation-grid{grid-template-columns:1fr}}
         @media(max-width:760px){.tab-bar{padding-left:0}.sidebar-toggle{display:flex}}
-        @media(max-width:760px){ main{padding-left:10px;padding-right:10px}nav{gap:14px;padding:0 10px;overflow-x:auto}nav button{min-width:max-content;padding:10px 0 9px;font-size:12px}.section-heading{align-items:start;flex-direction:column;gap:8px}.overview{gap:17px}.overview-hero{grid-template-columns:1fr;gap:16px;padding:21px 19px}.overview-state{width:max-content}.overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.overview-metric{padding:15px 14px}.overview-metric .metric{font-size:26px}.overview-section-head{align-items:start;flex-direction:column}.overview-protocols{justify-content:flex-start}.overview-sources{grid-template-columns:1fr;gap:12px}.map-toolbar{display:flex;align-items:stretch;gap:9px;flex-direction:column;padding:10px}.map-control-group{width:100%;gap:6px}.map-control-group.filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.map-control-group.filters .map-control-label{grid-column:1/-1}.map-control-group.filters select{width:100%;padding-left:7px;padding-right:7px;font-size:12px}.map-control-row{display:flex;align-items:stretch;flex-direction:column;gap:9px}.map-control-group.layers,.map-control-group.view{width:100%;display:flex;flex-wrap:wrap}.map-control-group.layers .map-control-label,.map-control-group.view .map-control-label{flex-basis:100%}.map-control-group.view select{min-width:0;flex:1}.map-control-group.history{justify-content:flex-start;overflow-x:auto;padding:2px}.map-control-label{font-size:9px}.map-toolbar button{padding-left:9px;padding-right:9px}.map-toolbar input[type="range"]{min-width:84px;flex:1}.map,.map.leaflet-container{height:58vh;min-height:410px}.map-stat{top:9px;right:9px}.map-footer{grid-template-columns:1fr;padding:10px}.map-legend{gap:7px 12px}.map-tile-state{text-align:left}.map-layer-status{grid-template-columns:1fr;gap:6px}.toolbar select,.toolbar button{flex:1}.nodes-table{overflow:visible}.nodes-table table{min-width:0;table-layout:fixed}.nodes-table th,.nodes-table td{padding:10px 7px}.nodes-table .node-protocol,.nodes-table .node-power,.nodes-table .node-signal,.nodes-table .node-hops,.nodes-table .node-role{display:none}.nodes-table .node-name{width:auto;min-width:0;overflow-wrap:anywhere}.nodes-table .node-mobile-protocol{display:block}.nodes-table .node-favorite{width:52px}.nodes-table .node-last-heard{width:82px}.last-heard{white-space:normal}.node-detail-head{padding:16px 14px 13px}.node-detail-body{padding:14px}.node-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.node-detail-groups,.node-detail-actions{grid-template-columns:1fr}.node-history-head{align-items:stretch;flex-direction:column}.node-history-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}.conversation-shell{height:auto;min-height:0;display:block;overflow:hidden}.conversation-rail{display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--divider-color)}.conversation-search{position:sticky;left:0;z-index:3;min-width:155px;padding:9px}.conversation-item{min-width:158px;max-width:180px;padding:10px;border-right:1px solid var(--divider-color)}.conversation-rail .rail-heading{display:none}.conversation-label small{display:block}.conversation-pane{height:calc(100vh - 294px);min-height:540px}.conversation-head{padding:11px;gap:8px}.conversation-head>.conversation-icon{display:none}.conversation-head .title{min-width:0;flex:1 1 100%}.conversation-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;flex:1 1 100%;width:100%;justify-content:stretch}.conversation-actions select{width:100%;min-width:0}.conversation-actions #mark-read{grid-column:1/-1}.messages{padding:12px}.message{width:100%;max-width:100%!important;padding:13px 14px}.message-head{align-items:flex-start;flex-wrap:wrap}.compose-grid{grid-template-columns:1fr} }
+        @media(max-width:760px){ main{padding-left:10px;padding-right:10px}nav{gap:14px;padding:0 10px;overflow-x:auto}nav button{min-width:max-content;padding:10px 0 9px;font-size:12px}.section-heading{align-items:start;flex-direction:column;gap:8px}.overview{gap:17px}.overview-hero{grid-template-columns:1fr;gap:16px;padding:21px 19px}.overview-state{width:max-content}.overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.overview-metric{padding:15px 14px}.overview-metric .metric{font-size:26px}.overview-section-head{align-items:start;flex-direction:column}.overview-protocols{justify-content:flex-start}.overview-sources{grid-template-columns:1fr;gap:12px}.map-toolbar{display:flex;align-items:stretch;gap:9px;flex-direction:column;padding:10px}.map-control-group{width:100%;gap:6px}.map-control-group.filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.map-control-group.filters .map-control-label{grid-column:1/-1}.map-control-group.filters select{width:100%;padding-left:7px;padding-right:7px;font-size:12px}.map-control-row{display:flex;align-items:stretch;flex-direction:column;gap:9px}.map-control-group.layers,.map-control-group.view{width:100%;display:grid;gap:7px}.map-control-group.layers{grid-template-columns:repeat(2,minmax(0,1fr))}.map-control-group.layers .map-control-label,.map-control-group.view .map-control-label{grid-column:1/-1}.map-control-group.layers #map-show-home{grid-column:1/-1}.map-control-group.view{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px minmax(110px,1.25fr)}.map-control-group.view select{min-width:0;width:100%}.map-control-group.layers button,.map-control-group.view button{width:100%;min-width:0}.map-control-group.history{justify-content:flex-start;overflow-x:auto;padding:2px}.map-control-label{font-size:9px}.map-toolbar button{padding-left:9px;padding-right:9px}.map-toolbar input[type="range"]{min-width:84px;flex:1}.map,.map.leaflet-container{height:58vh;min-height:410px}.map-stat{top:9px;right:9px}.map-footer{grid-template-columns:1fr;padding:10px}.map-legend{gap:7px 12px}.map-tile-state{text-align:left}.map-layer-status{grid-template-columns:1fr;gap:6px}.toolbar select,.toolbar button{flex:1}.nodes-table{overflow:visible}.nodes-table table{min-width:0;table-layout:fixed}.nodes-table th,.nodes-table td{padding:10px 7px}.nodes-table .node-protocol,.nodes-table .node-power,.nodes-table .node-signal,.nodes-table .node-hops,.nodes-table .node-role{display:none}.nodes-table .node-name{width:auto;min-width:0;overflow-wrap:anywhere}.nodes-table .node-mobile-protocol{display:block}.nodes-table .node-favorite{width:52px}.nodes-table .node-last-heard{width:82px}.last-heard{white-space:normal}.node-detail-head{padding:16px 14px 13px}.node-detail-body{padding:14px}.node-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.node-detail-groups,.node-detail-actions{grid-template-columns:1fr}.node-history-head{align-items:stretch;flex-direction:column}.node-history-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}.conversation-shell{height:auto;min-height:0;display:block;overflow:hidden}.conversation-rail{display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--divider-color)}.conversation-search{position:sticky;left:0;z-index:3;min-width:155px;padding:9px}.conversation-item{min-width:158px;max-width:180px;padding:10px;border-right:1px solid var(--divider-color)}.conversation-rail .rail-heading{display:none}.conversation-label small{display:block}.conversation-pane{height:calc(100vh - 294px);min-height:540px}.conversation-head{padding:11px;gap:8px}.conversation-head>.conversation-icon{display:none}.conversation-head .title{min-width:0;flex:1 1 100%}.conversation-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;flex:1 1 100%;width:100%;justify-content:stretch}.conversation-actions select{width:100%;min-width:0}.conversation-actions #mark-read{grid-column:1/-1}.messages{padding:12px}.message{width:100%;max-width:100%!important;padding:13px 14px}.message-head{align-items:flex-start;flex-wrap:wrap}.compose-grid{grid-template-columns:1fr} }
         @media(max-width:760px){
           .overview-hero { display:grid; gap:12px; padding:16px; }
           .overview-hero-actions { align-items:flex-start; }
@@ -1224,6 +1237,18 @@ class MeshMonitorPanel extends HTMLElement {
       .querySelector("#map-fit")
       ?.addEventListener("click", () => this._fitMap());
     this.shadowRoot
+      .querySelector("#map-home")
+      ?.addEventListener("click", () => this._focusHome());
+    this.shadowRoot
+      .querySelector("#map-show-home")
+      ?.addEventListener("click", () => {
+        this._mapShowHome = persistShowHome(
+          localStorage,
+          !this._mapShowHome,
+        );
+        this._render();
+      });
+    this.shadowRoot
       .querySelector("#map-fullscreen")
       ?.addEventListener("click", async () => {
         const shell = this.shadowRoot.querySelector(".map-shell");
@@ -1477,7 +1502,7 @@ class MeshMonitorPanel extends HTMLElement {
       <div class="map-head"><div><h2>Mesh map</h2><p class="muted">Explore current positions, stored links, and movement history.</p></div><span class="badge">${visible} visible</span></div>
       <div class="map-toolbar" aria-label="Map controls">
         <div class="map-control-group filters"><span class="map-control-label">Filter</span><select id="map-protocol" aria-label="Node protocol"><option value="all">All positions (${nodes.length})</option><option value="meshtastic" ${this._mapProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._mapProtocol === "meshcore" ? "selected" : ""}>MeshCore</option><option value="reticulum" ${this._mapProtocol === "reticulum" ? "selected" : ""}>Reticulum</option></select><select id="map-source" aria-label="Source"><option value="all">All sources</option>${sources.map(([id, name]) => `<option value="${escapeHtml(id)}" ${this._mapSource === id ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select><select id="map-freshness" aria-label="Last-heard age"><option value="all">Any age</option><option value="fresh" ${this._mapFreshness === "fresh" ? "selected" : ""}>Fresh ≤1h</option><option value="stale" ${this._mapFreshness === "stale" ? "selected" : ""}>Stale 1–24h</option><option value="old" ${this._mapFreshness === "old" ? "selected" : ""}>Old</option></select></div>
-        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}"><ha-icon icon="mdi:vector-polyline" aria-hidden="true"></ha-icon>Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}"><ha-icon icon="mdi:access-point-network" aria-hidden="true"></ha-icon>Neighbor SNR</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit"><ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>Fit</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen"><ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon></button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
+        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}"><ha-icon icon="mdi:vector-polyline" aria-hidden="true"></ha-icon>Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}"><ha-icon icon="mdi:access-point-network" aria-hidden="true"></ha-icon>Neighbor SNR</button><button id="map-show-home" class="${this._mapShowHome ? "active" : ""}" aria-pressed="${this._mapShowHome}" ${homeLocation(this._hass) ? "" : "disabled"}><ha-icon icon="mdi:home-map-marker" aria-hidden="true"></ha-icon>Show Home</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit"><ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>Fit</button><button id="map-home" ${homeLocation(this._hass) ? "" : "disabled"}><ha-icon icon="mdi:home" aria-hidden="true"></ha-icon>Home</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen"><ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon></button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
         <div class="map-control-group history"><span class="map-control-label">Trail</span><select id="map-position-range" aria-label="Trail time range">${[[1,"1h"],[6,"6h"],[24,"24h"],[72,"3d"],[168,"7d"]].map(([hours,label]) => `<option value="${hours}" ${this._positionRange === hours ? "selected" : ""}>${label}</option>`).join("")}</select>${playback}${clear}</div>
       </div>
       <div class="map-canvas"><div id="mesh-map" class="map ${mapStyle.className}">${state}</div><span class="map-stat">${mapCountLabel(visible, links.length, trailCount)}</span></div>
@@ -1570,7 +1595,13 @@ class MeshMonitorPanel extends HTMLElement {
 
   _nodePositionLookup(source) {
     const positions = new Map();
+    const hidden = new Set(
+      (source.nodes || [])
+        .filter((node) => !nodeIsVisibleOnMap(node))
+        .flatMap((node) => [node.id, node.node_num].flatMap((value) => this._nodeKeys(value))),
+    );
     const add = (node) => {
+      if ([node.id, node.node_num].flatMap((value) => this._nodeKeys(value)).some((key) => hidden.has(key))) return;
       if (node.latitude == null || node.longitude == null) return;
       const point = [Number(node.latitude), Number(node.longitude)];
       if (!point.every(Number.isFinite)) return;
@@ -1586,11 +1617,19 @@ class MeshMonitorPanel extends HTMLElement {
     const links = [];
     for (const source of this._selectedMapSources()) {
       const positions = this._nodePositionLookup(source);
+      const hidden = new Set(
+        (source.nodes || [])
+          .filter((node) => !nodeIsVisibleOnMap(node))
+          .flatMap((node) => [node.id, node.node_num].flatMap((value) => this._nodeKeys(value))),
+      );
+      const isHidden = (value) => this._nodeKeys(value).some((key) => hidden.has(key));
       const resolve = (value) =>
         this._nodeKeys(value).map((key) => positions.get(key)).find(Boolean);
       if (this._mapTopology && source.topology?.state === "supported") {
         for (const edge of source.topology.edges) {
-          const points = [edge.from_id, ...(edge.route || []), edge.to_id]
+          const path = [edge.from_id, ...(edge.route || []), edge.to_id];
+          if (path.some(isHidden)) continue;
+          const points = path
             .map(resolve)
             .filter(Boolean)
             .filter((point, index, values) => index === 0 || point[0] !== values[index - 1][0] || point[1] !== values[index - 1][1]);
@@ -1601,6 +1640,7 @@ class MeshMonitorPanel extends HTMLElement {
       }
       if (this._mapNeighbors && source.neighbors?.state === "supported") {
         for (const link of source.neighbors.links) {
+          if (isHidden(link.from_id ?? link.from_num) || isHidden(link.to_id ?? link.to_num)) continue;
           const directValues = [
             [link.from_latitude, link.from_longitude],
             [link.to_latitude, link.to_longitude],
@@ -1634,6 +1674,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._mapLayer = null;
       this._mapLinkLayer = null;
       this._mapTrailLayer = null;
+      this._mapHomeLayer = null;
     }
   }
 
@@ -1677,12 +1718,58 @@ class MeshMonitorPanel extends HTMLElement {
     this._renderMapLinks();
     this._renderPositionTrail();
     this._renderMapMarkers();
+    this._renderHomeMarker();
     map.on("zoomend", () => this._renderMapMarkers());
+  }
+
+  _refreshMapSnapshot() {
+    const map = this._mapInstance;
+    if (!map) return;
+    const positioned = this._allMapNodes().filter(
+      (node) => node.latitude != null && node.longitude != null,
+    );
+    const nextNodes = this._filteredMapNodes(positioned);
+    const nextLinks = this._mapLinks();
+    const nodeSignature = (nodes) => JSON.stringify(nodes.map((node) => ({
+      entry_id: node.entry_id,
+      source_id: node.source_id,
+      id: node.id,
+      name: node.name,
+      protocol: node.protocol,
+      latitude: node.latitude,
+      longitude: node.longitude,
+      device_id: node.device_id,
+      battery: node.battery,
+      voltage: node.voltage,
+      rssi: node.rssi,
+      snr: node.snr,
+      activity: nodeActivity(node),
+      freshness: this._freshness(node),
+    })));
+    const nodesChanged = nodeSignature(this._mapNodes || []) !== nodeSignature(nextNodes);
+    const linksChanged = JSON.stringify(this._mapLinksVisible || []) !== JSON.stringify(nextLinks);
+    this._mapNodes = nextNodes;
+    this._mapLinksVisible = nextLinks;
+    if (linksChanged) this._renderMapLinks();
+    if (nodesChanged) this._renderMapMarkers();
+    const count = this.shadowRoot?.querySelector(".map-stat");
+    if (count)
+      count.textContent = mapCountLabel(
+        nextNodes.length,
+        nextLinks.length,
+        this._visiblePositionTrail()?.fixes?.length || 0,
+      );
+    const statuses = this.shadowRoot?.querySelector(".map-layer-status");
+    if (statuses) {
+      const trailBad = this._positionTrail?.state === "error";
+      statuses.innerHTML = `${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span>`;
+    }
   }
 
   _renderMapLinks() {
     const map = this._mapInstance;
     if (!map) return;
+    if (this._mapLinkLayer) this._mapLinkLayer.remove();
     this._mapLinkLayer = window.L.layerGroup().addTo(map);
     for (const link of this._mapLinksVisible || []) {
       const topology = link.kind === "topology";
@@ -1699,6 +1786,7 @@ class MeshMonitorPanel extends HTMLElement {
   _renderMapMarkers() {
     const map = this._mapInstance;
     if (!map) return;
+    const openNodeKey = this._openMapNodeKey;
     if (this._mapLayer) this._mapLayer.remove();
     this._mapLayer = window.L.layerGroup().addTo(map);
     const zoom = map.getZoom();
@@ -1757,7 +1845,7 @@ class MeshMonitorPanel extends HTMLElement {
             ? `${node.snr} dB`
             : "—";
       const link = node.device_id
-        ? `<p><a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open Home Assistant device</a></p>`
+        ? `<a href="/config/devices/device/${encodeURIComponent(node.device_id)}">Open HA device</a>`
         : "";
       const nodeDetail = this._allNodes().some(
         (item) =>
@@ -1765,23 +1853,53 @@ class MeshMonitorPanel extends HTMLElement {
           item.source_id === node.source_id &&
           item.id === node.id,
       )
-        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button></p>`
+        ? `<button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-map-node-detail="${escapeHtml(node.id)}">View node details</button>`
         : "";
       const trail = node.protocol === "meshtastic"
-        ? `<p><button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button></p>`
+        ? `<button data-entry="${escapeHtml(node.entry_id)}" data-source="${escapeHtml(node.source_id)}" data-position-node="${escapeHtml(node.id)}" data-node-name="${escapeHtml(node.name)}">Load ${this._rangeLabel(this._positionRange)} trail</button>`
         : "";
       const activity = nodeActivity(node);
+      const nodeKey = `${node.entry_id}\u0000${node.source_id}\u0000${node.id}`;
       marker.bindPopup(
-        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail}${link}${nodeDetail}`,
+        `<strong>${escapeHtml(node.name)}</strong><p><span class="badge protocol-${escapeHtml(node.protocol)}">${escapeHtml(node.protocol)}</span> · ${escapeHtml(freshness)}</p><p>${escapeHtml(activity.label)}: ${escapeHtml(readableTime(activity.value))}<br>Battery: ${batteryMarkup(node.battery, node.voltage)}<br>Signal: ${escapeHtml(signal)}<br>Source: ${escapeHtml(node.source_id)}</p>${trail || link || nodeDetail ? `<div class="map-popup-actions">${trail}${link}${nodeDetail}</div>` : ""}`,
       );
+      marker.on("popupopen", () => { this._openMapNodeKey = nodeKey; });
+      marker.on("popupclose", () => {
+        if (this._openMapNodeKey === nodeKey) this._openMapNodeKey = null;
+      });
       if (
         this._mapFocusNode ===
-        `${node.entry_id}\u0000${node.source_id}\u0000${node.id}`
+        nodeKey
       ) {
         marker.openPopup();
         this._mapFocusNode = null;
+      } else if (openNodeKey === nodeKey) {
+        marker.openPopup();
       }
     }
+  }
+
+  _renderHomeMarker() {
+    const map = this._mapInstance;
+    if (!map) return;
+    if (this._mapHomeLayer) this._mapHomeLayer.remove();
+    this._mapHomeLayer = null;
+    const home = homeLocation(this._hass);
+    if (!this._mapShowHome || !home) return;
+    this._mapHomeLayer = window.L.layerGroup().addTo(map);
+    window.L.marker([home.latitude, home.longitude], {
+      pane: "markers",
+      title: home.name,
+      zIndexOffset: 1000,
+      icon: window.L.divIcon({
+        className: "",
+        html: '<div class="map-home-marker"><ha-icon icon="mdi:home"></ha-icon></div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      }),
+    })
+      .bindTooltip(escapeHtml(home.name))
+      .addTo(this._mapHomeLayer);
   }
 
   _renderPositionTrail() {
@@ -1929,6 +2047,12 @@ class MeshMonitorPanel extends HTMLElement {
     if (!points.length) return;
     const bounds = window.L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
+  }
+
+  _focusHome() {
+    const home = homeLocation(this._hass);
+    if (!this._mapInstance || !home) return;
+    this._mapInstance.setView([home.latitude, home.longitude], 14);
   }
 
   _nodes(nodes, sources = []) {
@@ -2793,7 +2917,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260823-1752")) {
-  customElements.define("meshmonitor-panel-20260823-1752", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0853")) {
+  customElements.define("meshmonitor-panel-20260829-0853", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
