@@ -187,6 +187,14 @@ async def async_setup_entry(
         ) -> None:
             plans = _sensor_entity_id_plans(registry, planning_sources, reservations)
             entities: list[MeshMonitorNodeSensor] = []
+            eligible = {
+                (node.id, description.key)
+                for node in coordinator.nodes.values()
+                if node_entities_enabled(source, node)
+                for description in NODE_SENSORS
+                if description.value_fn(node) is not None
+            }
+            known.intersection_update(eligible)
             for node in coordinator.nodes.values():
                 if not node_entities_enabled(source, node):
                     continue

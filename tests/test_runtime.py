@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from homeassistant.const import CONF_TOKEN, CONF_URL
@@ -28,6 +29,7 @@ from custom_components.meshmonitor.const import (
     CONF_SOURCES,
     DOMAIN,
     NODE_DEVICE_POLICY_ALL,
+    NODE_DEVICE_POLICY_FAVORITES,
 )
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
@@ -353,6 +355,70 @@ async def test_sensor_platform_batches_sources_and_attaches_nodes_to_exact_sourc
         source_device_identifier(fingerprint, "source-b"),
     }
     assert all("via_device" not in entity.device_info for entity in last_heard)
+
+
+async def test_sensor_discovery_readds_node_after_favorite_policy_removal(
+    hass: HomeAssistant,
+) -> None:
+    """An ineligible interval must not permanently suppress rediscovery."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {
+                CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_FAVORITES
+            },
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    favorite = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "lastHeard": "2026-08-17T12:00:00Z",
+            "isFavorite": True,
+        }
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={favorite.id: favorite},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_sensors(hass, entry, add_entities)  # type: ignore[arg-type]
+    listener = coordinator.async_add_listener.call_args.args[0]
+    initial_count = len(added)
+    assert sum(getattr(entity, "node_id", None) == favorite.id for entity in added) == 1
+
+    coordinator.nodes = {
+        favorite.id: Node.from_dict(
+            {
+                "id": favorite.id,
+                "longName": "Mobile node",
+                "lastHeard": "2026-08-17T12:00:00Z",
+                "isFavorite": False,
+            }
+        )
+    }
+    listener()
+    assert len(added) == initial_count
+
+    coordinator.nodes = {favorite.id: favorite}
+    listener()
+    assert len(added) == initial_count + 1
+    assert sum(getattr(entity, "node_id", None) == favorite.id for entity in added) == 2
 
 
 async def test_shared_message_runtime_uses_server_interval_and_enabled_sources(

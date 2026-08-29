@@ -51,6 +51,14 @@ async def async_setup_entry(
             planning_sources: tuple[MeshMonitorSourceRuntime, ...] = planning_sources,
         ) -> None:
             fingerprint = server_fingerprint(source.data["url"])
+            eligible = {
+                node.id
+                for node in coordinator.nodes.values()
+                if node_entities_enabled(source, node)
+                and node.latitude is not None
+                and node.longitude is not None
+            }
+            known.intersection_update(eligible)
             specs = [
                 node_entity_id_spec(
                     domain="device_tracker",
