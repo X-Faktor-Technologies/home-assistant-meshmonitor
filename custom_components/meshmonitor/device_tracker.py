@@ -16,7 +16,7 @@ from . import (
 )
 from .const import CONF_ENABLE_DEVICE_TRACKERS
 from .coordinator import MeshMonitorCoordinator
-from .entity import MeshMonitorNodeEntity
+from .entity import MeshMonitorNodeEntity, async_add_node_entities
 from .entity_policy import node_entities_enabled
 from .registry import (
     entity_id_reservations,
@@ -93,7 +93,7 @@ async def async_setup_entry(
                     )
                 )
             if entities:
-                async_add_entities(entities)
+                async_add_node_entities(hass, async_add_entities, entities)
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))

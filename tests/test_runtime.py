@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -31,6 +32,7 @@ from custom_components.meshmonitor.const import (
     NODE_DEVICE_POLICY_ALL,
     NODE_DEVICE_POLICY_FAVORITES,
 )
+from custom_components.meshmonitor.entity import async_add_node_entities
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
     server_device_identifier,
@@ -76,6 +78,32 @@ def _entry(*, options: dict[str, object] | None = None) -> MockConfigEntry:
         version=2,
         unique_id=server_fingerprint("https://mesh.invalid"),
     )
+
+
+async def test_dynamic_discovery_waits_for_matching_entity_removal(
+    hass: HomeAssistant,
+) -> None:
+    """A rediscovered unique ID is added only after its old platform object exits."""
+    gate = asyncio.Event()
+
+    async def remove_old_entity() -> None:
+        await gate.wait()
+
+    removal = hass.async_create_task(remove_old_entity(), "Remove old node entity")
+    hass.data.setdefault(DOMAIN, {})["node_entity_removals"] = {"node-entity": removal}
+    entity = SimpleNamespace(unique_id="node-entity")
+    added: list[object] = []
+
+    async_add_node_entities(
+        hass,
+        lambda entities: added.extend(entities),  # type: ignore[arg-type]
+        [entity],  # type: ignore[list-item]
+    )
+    assert added == []
+
+    gate.set()
+    await hass.async_block_till_done()
+    assert added == [entity]
 
 
 async def test_setup_serializes_sources_keeps_failed_sibling_and_creates_sources(

@@ -27,7 +27,7 @@ from . import (
 )
 from .const import SOURCE_TYPE_RETICULUM
 from .coordinator import MeshMonitorCoordinator
-from .entity import MeshMonitorNodeEntity, source_device_info
+from .entity import MeshMonitorNodeEntity, async_add_node_entities, source_device_info
 from .entity_policy import node_entities_enabled
 from .registry import (
     EntityIdSpec,
@@ -212,7 +212,7 @@ async def async_setup_entry(
                         )
                     )
             if entities:
-                async_add_entities(entities)
+                async_add_node_entities(hass, async_add_entities, entities)
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))

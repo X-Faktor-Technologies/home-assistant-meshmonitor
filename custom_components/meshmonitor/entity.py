@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from homeassistant.core import callback
+import asyncio
+from collections.abc import Iterable
+
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MeshMonitorSourceRuntime
-from .const import SOURCE_TYPE_MESHCORE, SOURCE_TYPE_RETICULUM
+from .const import DOMAIN, SOURCE_TYPE_MESHCORE, SOURCE_TYPE_RETICULUM
 from .coordinator import MeshMonitorCoordinator
 from .entity_policy import is_source_node, node_entities_enabled
 from .registry import (
@@ -17,6 +22,39 @@ from .registry import (
     source_device_identifier,
 )
 from .vendor_meshmonitor_client import Node
+
+_NODE_ENTITY_REMOVALS = "node_entity_removals"
+
+
+def async_add_node_entities(
+    hass: HomeAssistant,
+    async_add_entities: AddEntitiesCallback,
+    entities: Iterable[Entity],
+) -> None:
+    """Add entities only after matching in-flight removals have completed."""
+    batch = tuple(entities)
+    removals: dict[str, asyncio.Task[None]] = hass.data.setdefault(DOMAIN, {}).setdefault(
+        _NODE_ENTITY_REMOVALS, {}
+    )
+    pending = tuple(
+        task
+        for entity in batch
+        if entity.unique_id is not None
+        and (task := removals.get(entity.unique_id)) is not None
+    )
+    if not pending:
+        async_add_entities(batch)
+        return
+
+    async def add_after_removals() -> None:
+        await asyncio.gather(*pending)
+        async_add_entities(batch)
+
+    hass.async_create_task(
+        add_after_removals(),
+        "Rediscover retired MeshMonitor node entities",
+        eager_start=True,
+    )
 
 
 def source_device_info(source: MeshMonitorSourceRuntime) -> DeviceInfo:
@@ -95,10 +133,22 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
         ):
             if not self._removal_requested:
                 self._removal_requested = True
-                self.hass.async_create_task(
+                removals: dict[str, asyncio.Task[None]] = self.hass.data.setdefault(
+                    DOMAIN, {}
+                ).setdefault(_NODE_ENTITY_REMOVALS, {})
+                task = self.hass.async_create_task(
                     self.async_remove(force_remove=True),
                     f"Remove retired MeshMonitor node entity {self.unique_id}",
                     eager_start=True,
                 )
+                if self.unique_id is not None:
+                    unique_id = self.unique_id
+                    removals[unique_id] = task
+
+                    def clear_removal(done: asyncio.Task[None]) -> None:
+                        if removals.get(unique_id) is done:
+                            removals.pop(unique_id, None)
+
+                    task.add_done_callback(clear_removal)
             return
         super()._handle_coordinator_update()
