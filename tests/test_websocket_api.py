@@ -748,7 +748,9 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
 async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> None:
     client = Mock()
     client.set_meshtastic_favorite = AsyncMock(return_value=None)
-    coordinator = SimpleNamespace(async_request_refresh=AsyncMock())
+    coordinator = SimpleNamespace(
+        async_request_refresh=AsyncMock(), async_update_listeners=Mock()
+    )
     server_entry = SimpleNamespace(
         entry_id="entry-1",
         data={"url": "http://mesh.invalid"},
@@ -796,6 +798,7 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
         "source-1", "remote", False
     )
     coordinator.async_request_refresh.assert_awaited_once_with()
+    coordinator.async_update_listeners.assert_called_once_with()
     reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
     wait_for_removal.assert_awaited_once_with(
         hass,

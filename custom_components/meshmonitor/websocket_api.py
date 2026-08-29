@@ -1196,6 +1196,7 @@ async def websocket_set_favorite(
         )
         return
     await entry.coordinator.async_request_refresh()
+    entry.coordinator.async_update_listeners()
     from . import server_options
     from .entity import async_wait_node_entity_removals
     from .entity_policy import async_reconcile_node_registries
