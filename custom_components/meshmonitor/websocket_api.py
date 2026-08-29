@@ -1033,56 +1033,66 @@ async def websocket_send_message(
         connection.send_error(msg["id"], exc.code, exc.message)
         return
 
-    async def perform_send() -> None:
-        """Finish the one reviewed send independently of the browser socket."""
-        client = entry.runtime_data.client
-        try:
-            if source_type == SOURCE_TYPE_RETICULUM:
-                reticulum_result = await client.send_reticulum_message(
-                    msg["source_id"],
-                    msg["text"],
-                    to_destination_hash=msg.get("destination", ""),
-                )
-                delivery_state = reticulum_result.state
-            elif source_type == SOURCE_TYPE_MESHCORE:
-                meshcore_result = await client.send_meshcore_message(
-                    msg["source_id"],
-                    msg["text"],
-                    channel=msg.get("channel"),
-                    to_public_key=msg.get("destination"),
-                )
-                delivery_state = meshcore_result.delivery_state
-            else:
-                meshtastic_result = await client.send_meshtastic_message(
-                    msg["source_id"],
-                    msg["text"],
-                    channel=msg.get("channel"),
-                    to_node_id=msg.get("destination"),
-                )
-                delivery_state = meshtastic_result.delivery_state
-        except Exception as exc:  # Result is retained without automatic retry.
-            _LOGGER.error("Background MeshMonitor send failed: %s", type(exc).__name__)
-            return
-        _LOGGER.info(
-            "Background MeshMonitor send accepted for source %s (%s)",
-            msg["source_id"],
-            delivery_state or "accepted",
-        )
-        message_runtime = (
-            hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
-        )
-        if message_runtime:
-            await message_runtime["coordinator"].async_request_refresh()
-
+    client = entry.runtime_data.client
+    message_id: str | None
     try:
-        hass.async_create_task(perform_send(), "MeshMonitor reviewed radio send")
-    except Exception as exc:
-        _LOGGER.exception("Unable to schedule reviewed MeshMonitor send")
-        connection.send_error(msg["id"], "queue_failed", type(exc).__name__)
+        if source_type == SOURCE_TYPE_RETICULUM:
+            reticulum_result = await client.send_reticulum_message(
+                msg["source_id"], msg["text"], to_destination_hash=msg.get("destination", "")
+            )
+            delivery_state = reticulum_result.state
+            message_id = reticulum_result.id
+        elif source_type == SOURCE_TYPE_MESHCORE:
+            meshcore_result = await client.send_meshcore_message(
+                msg["source_id"],
+                msg["text"],
+                channel=msg.get("channel"),
+                to_public_key=msg.get("destination"),
+            )
+            delivery_state = meshcore_result.delivery_state
+            message_id = meshcore_result.message_id
+        else:
+            meshtastic_result = await client.send_meshtastic_message(
+                msg["source_id"],
+                msg["text"],
+                channel=msg.get("channel"),
+                to_node_id=msg.get("destination"),
+            )
+            delivery_state = meshtastic_result.delivery_state
+            message_id = meshtastic_result.message_id
+    except MeshMonitorAuthenticationError:
+        connection.send_error(msg["id"], "invalid_auth", "MeshMonitor rejected the token")
         return
+    except MeshMonitorPermissionError:
+        connection.send_error(
+            msg["id"], "permission_denied", "MeshMonitor token lacks messages:write"
+        )
+        return
+    except MeshMonitorTransmitDisabledError:
+        connection.send_error(msg["id"], "source_tx_disabled", "MeshMonitor transmit is disabled")
+        return
+    except MeshMonitorRateLimitError:
+        connection.send_error(msg["id"], "rate_limited", "MeshMonitor rate limit reached")
+        return
+    except (MeshMonitorConnectionError, MeshMonitorServerError):
+        connection.send_error(msg["id"], "cannot_connect", "MeshMonitor is unreachable")
+        return
+    except (MeshMonitorNotFoundError, MeshMonitorResponseError):
+        connection.send_error(msg["id"], "send_failed", "MeshMonitor rejected the send")
+        return
+
+    message_runtime = (
+        hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
+    )
+    if message_runtime:
+        await message_runtime["coordinator"].async_request_refresh()
     connection.send_result(
         msg["id"],
-        {"accepted": True, "message_id": None, "delivery_state": "ha_queued"},
+        {
+            "accepted": True,
+            "message_id": message_id,
+            "delivery_state": delivery_state or "accepted",
+        },
     )
 
 

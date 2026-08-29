@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0853";
+} from "./map-view.js?v=20260829-1910";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -785,6 +785,7 @@ class MeshMonitorPanel extends HTMLElement {
         .compose-count { font-size:10px; }
         .send-status { margin-top:7px; font-size:11px; line-height:1.4; }
         .send-status.ambiguous { color:var(--warning-color,#ffb300); }
+        .send-status:not(.ambiguous) { color:var(--error-color,#db4437); }
         .reply-placeholder { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 16px; border-top:1px solid var(--divider-color); background:var(--card-background-color); color:var(--secondary-text-color); }
         .reply-placeholder strong { display:block; color:var(--primary-text-color); font-size:13px; }
         .reply-placeholder span { display:block; margin-top:2px; font-size:11px; line-height:1.4; }
@@ -832,7 +833,7 @@ class MeshMonitorPanel extends HTMLElement {
           .message-identity { align-items:flex-start; flex-direction:column; gap:3px; }
           .reply-state { display:none; }
         }
-        @media(max-width:760px){.conversation-shell{height:max(640px,calc(100dvh - 92px));display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto}.compose-top{align-items:flex-start;flex-direction:column}.compose-top label,.compose-top select{width:100%;max-width:none}.compose-body{grid-template-columns:1fr}.compose-action{display:flex;align-items:center;justify-content:space-between}.send-review-grid{grid-template-columns:1fr}}
+        @media(max-width:760px){.conversation-shell{height:calc(100dvh - 92px);min-height:0;max-height:none;display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto;padding-bottom:max(10px,env(safe-area-inset-bottom))}.compose-top{align-items:flex-start;flex-direction:column}.compose-top label,.compose-top select{width:100%;max-width:none}.compose-route{width:100%;white-space:normal;overflow-wrap:anywhere}.compose-body{grid-template-columns:1fr}.compose-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1fr);align-items:center;justify-items:stretch}.compose-action #compose-send{width:100%;min-height:44px}.compose-count{text-align:left}.send-review-grid{grid-template-columns:1fr}}
         @media(prefers-reduced-motion:reduce){.leaflet-fade-anim .leaflet-popup,.leaflet-zoom-anim .leaflet-zoom-animated{transition:none!important}}
       </style>
       ${this._error ? `<div class="error">${escapeHtml(this._error)}</div>` : ""}
@@ -2876,9 +2877,6 @@ class MeshMonitorPanel extends HTMLElement {
       };
       if (conversation.type === "direct") request.destination = conversation.recipient;
       else request.channel = conversation.channel;
-      // HA accepts the reviewed command immediately and owns the single
-      // background transaction, so browser command deadlines cannot cancel a
-      // radio handoff already authorized by the user.
       const result = await this._hass.callWS(request);
       if (result.accepted) {
         pending.state = "queued";
@@ -2917,7 +2915,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0853")) {
-  customElements.define("meshmonitor-panel-20260829-0853", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-1910")) {
+  customElements.define("meshmonitor-panel-20260829-1910", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

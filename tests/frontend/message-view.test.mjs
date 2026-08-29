@@ -396,6 +396,10 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.match(panel, /border-bottom-right-radius:0/);
   assert.match(panel, /main\.messages-view \{[^}]*overflow:hidden/);
   assert.match(panel, /#compose-send \{[^}]*background:var\(--primary-color\)/);
+  assert.match(panel, /\.compose-route\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/);
+  assert.match(panel, /\.compose-action #compose-send\{[^}]*width:100%[^}]*min-height:44px/);
+  assert.match(panel, /safe-area-inset-bottom/);
+  assert.doesNotMatch(panel, /height:max\(640px,calc\(100dvh - 92px\)\)/);
   assert.doesNotMatch(panel, /\.conversation-item \{[^}]*border-bottom:/);
   assert.doesNotMatch(panel, /window\.confirm/);
   assert.doesNotMatch(panel, /Review outbound message/);
