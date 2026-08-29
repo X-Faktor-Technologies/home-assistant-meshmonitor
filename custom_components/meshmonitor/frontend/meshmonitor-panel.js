@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0748";
+} from "./map-view.js?v=20260829-0803";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -575,7 +575,7 @@ class MeshMonitorPanel extends HTMLElement {
         .map-marker { width:19px; height:19px; border:2px solid #effbff; border-radius:50%; box-shadow:0 0 0 3px #061017cc,0 0 13px currentColor; }
         .map-marker.meshtastic { background:var(--protocol-meshtastic); color:var(--protocol-meshtastic); } .map-marker.meshcore { background:var(--protocol-meshcore); color:var(--protocol-meshcore); } .map-marker.reticulum { background:var(--protocol-reticulum); color:var(--protocol-reticulum); }
         .map-marker.stale { opacity:.72; } .map-marker.old { opacity:.52; filter:grayscale(.55); }
-        .map-home-marker { width:34px; height:34px; display:grid; place-items:center; color:white; background:var(--primary-color); border:3px solid white; border-radius:50%; box-shadow:0 2px 10px #0009; }
+        .map-home-marker { width:34px; height:34px; display:grid; place-items:center; color:#1c1c1c; background:var(--warning-color,#ff9800); border:3px solid white; border-radius:50%; box-shadow:0 2px 10px #0009; }
         .map-home-marker ha-icon { --mdc-icon-size:21px; }
         .map-cluster { display:flex; align-items:center; justify-content:center; width:38px; height:38px; border:2px solid #dff6ff; border-radius:50%; background:linear-gradient(145deg,#2187bd,#125174); color:#fff; font-weight:800; box-shadow:0 0 0 3px #061017cc,0 4px 15px #000a; }
         .map-state { position:absolute; inset:0; z-index:1; display:grid; place-items:center; padding:32px; text-align:center; }
@@ -2858,7 +2858,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0748")) {
-  customElements.define("meshmonitor-panel-20260829-0748", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0803")) {
+  customElements.define("meshmonitor-panel-20260829-0803", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

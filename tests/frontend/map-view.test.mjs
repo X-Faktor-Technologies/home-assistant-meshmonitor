@@ -168,6 +168,8 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.match(panel, /id="map-home"/);
   assert.match(panel, /_renderHomeMarker\(\)/);
   assert.match(panel, /_focusHome\(\)/);
+  assert.match(panel, /\.map-home-marker \{[^}]*background:var\(--warning-color,#ff9800\)/);
+  assert.doesNotMatch(panel, /\.map-home-marker \{[^}]*background:var\(--primary-color\)/);
 });
 
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {
