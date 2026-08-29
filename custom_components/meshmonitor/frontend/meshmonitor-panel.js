@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js";
+} from "./map-view.js?v=20260829-0731";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
