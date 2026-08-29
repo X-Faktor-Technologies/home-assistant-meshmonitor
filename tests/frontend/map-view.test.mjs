@@ -4,13 +4,17 @@ import { readFileSync } from "node:fs";
 
 import {
   MAP_STYLE_STORAGE,
+  MAP_SHOW_HOME_STORAGE,
+  homeLocation,
   mapCountLabel,
   mapEmptyPresentation,
   mapLayerSummary,
   mapStylePresentation,
   nodeIsVisibleOnMap,
   persistMapStyle,
+  persistShowHome,
   readMapStyle,
+  readShowHome,
 } from "../../custom_components/meshmonitor/frontend/map-view.js";
 
 const empty = (overrides = {}) => ({
@@ -103,6 +107,47 @@ test("map style presentation enables tiles only for the two tile styles", () => 
   assert.equal(mapStylePresentation("invalid").value, "neutral-dark");
 });
 
+test("home visibility is off by default and persists in browser storage", () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+
+  assert.equal(readShowHome(storage), false);
+  assert.equal(persistShowHome(storage, true), true);
+  assert.equal(values.get(MAP_SHOW_HOME_STORAGE), "true");
+  assert.equal(readShowHome(storage), true);
+  assert.equal(persistShowHome(storage, false), false);
+  assert.equal(readShowHome(storage), false);
+});
+
+test("home location prefers zone.home and falls back to HA configuration", () => {
+  assert.deepEqual(
+    homeLocation({
+      config: { latitude: 10, longitude: 20 },
+      states: {
+        "zone.home": {
+          attributes: {
+            latitude: 30,
+            longitude: 40,
+            friendly_name: "Our Home",
+          },
+        },
+      },
+    }),
+    { latitude: 30, longitude: 40, name: "Our Home" },
+  );
+  assert.deepEqual(
+    homeLocation({ config: { latitude: 10, longitude: 20 }, states: {} }),
+    { latitude: 10, longitude: 20, name: "Home" },
+  );
+  assert.equal(
+    homeLocation({ config: { latitude: 91, longitude: 20 }, states: {} }),
+    null,
+  );
+});
+
 test("map polish includes Reticulum positions, clear filters, and accessible icon controls", () => {
   const panel = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
@@ -119,6 +164,10 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.match(panel, /\.filter\(nodeIsVisibleOnMap\)/);
   assert.match(panel, /path\.some\(isHidden\)/);
   assert.match(panel, /isHidden\(link\.from_id/);
+  assert.match(panel, /id="map-show-home"/);
+  assert.match(panel, /id="map-home"/);
+  assert.match(panel, /_renderHomeMarker\(\)/);
+  assert.match(panel, /_focusHome\(\)/);
 });
 
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {

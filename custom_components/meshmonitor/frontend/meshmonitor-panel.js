@@ -28,13 +28,16 @@ import {
 } from "./automation-view.js";
 import {
   MAP_STYLES,
+  homeLocation,
   mapCountLabel,
   mapEmptyPresentation,
   mapLayerSummary,
   mapStylePresentation,
   nodeIsVisibleOnMap,
   persistMapStyle,
+  persistShowHome,
   readMapStyle,
+  readShowHome,
 } from "./map-view.js";
 import {
   reticulumCardPresentation,
@@ -170,6 +173,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._mapSource = "all";
       this._mapFreshness = "all";
       this._mapStyle = readMapStyle(localStorage);
+      this._mapShowHome = readShowHome(localStorage);
       this._mapTopology =
         localStorage.getItem("meshmonitor.map.topology") !== "false";
       this._mapNeighbors =
@@ -571,6 +575,8 @@ class MeshMonitorPanel extends HTMLElement {
         .map-marker { width:19px; height:19px; border:2px solid #effbff; border-radius:50%; box-shadow:0 0 0 3px #061017cc,0 0 13px currentColor; }
         .map-marker.meshtastic { background:var(--protocol-meshtastic); color:var(--protocol-meshtastic); } .map-marker.meshcore { background:var(--protocol-meshcore); color:var(--protocol-meshcore); } .map-marker.reticulum { background:var(--protocol-reticulum); color:var(--protocol-reticulum); }
         .map-marker.stale { opacity:.72; } .map-marker.old { opacity:.52; filter:grayscale(.55); }
+        .map-home-marker { width:34px; height:34px; display:grid; place-items:center; color:white; background:var(--primary-color); border:3px solid white; border-radius:50%; box-shadow:0 2px 10px #0009; }
+        .map-home-marker ha-icon { --mdc-icon-size:21px; }
         .map-cluster { display:flex; align-items:center; justify-content:center; width:38px; height:38px; border:2px solid #dff6ff; border-radius:50%; background:linear-gradient(145deg,#2187bd,#125174); color:#fff; font-weight:800; box-shadow:0 0 0 3px #061017cc,0 4px 15px #000a; }
         .map-state { position:absolute; inset:0; z-index:1; display:grid; place-items:center; padding:32px; text-align:center; }
         .map-state>div { max-width:480px; padding:24px 26px; border:1px solid #ffffff1c; border-radius:14px; background:#0b151de8; box-shadow:0 10px 35px #0008; }
@@ -1225,6 +1231,18 @@ class MeshMonitorPanel extends HTMLElement {
       .querySelector("#map-fit")
       ?.addEventListener("click", () => this._fitMap());
     this.shadowRoot
+      .querySelector("#map-home")
+      ?.addEventListener("click", () => this._focusHome());
+    this.shadowRoot
+      .querySelector("#map-show-home")
+      ?.addEventListener("click", () => {
+        this._mapShowHome = persistShowHome(
+          localStorage,
+          !this._mapShowHome,
+        );
+        this._render();
+      });
+    this.shadowRoot
       .querySelector("#map-fullscreen")
       ?.addEventListener("click", async () => {
         const shell = this.shadowRoot.querySelector(".map-shell");
@@ -1478,7 +1496,7 @@ class MeshMonitorPanel extends HTMLElement {
       <div class="map-head"><div><h2>Mesh map</h2><p class="muted">Explore current positions, stored links, and movement history.</p></div><span class="badge">${visible} visible</span></div>
       <div class="map-toolbar" aria-label="Map controls">
         <div class="map-control-group filters"><span class="map-control-label">Filter</span><select id="map-protocol" aria-label="Node protocol"><option value="all">All positions (${nodes.length})</option><option value="meshtastic" ${this._mapProtocol === "meshtastic" ? "selected" : ""}>Meshtastic</option><option value="meshcore" ${this._mapProtocol === "meshcore" ? "selected" : ""}>MeshCore</option><option value="reticulum" ${this._mapProtocol === "reticulum" ? "selected" : ""}>Reticulum</option></select><select id="map-source" aria-label="Source"><option value="all">All sources</option>${sources.map(([id, name]) => `<option value="${escapeHtml(id)}" ${this._mapSource === id ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}</select><select id="map-freshness" aria-label="Last-heard age"><option value="all">Any age</option><option value="fresh" ${this._mapFreshness === "fresh" ? "selected" : ""}>Fresh ≤1h</option><option value="stale" ${this._mapFreshness === "stale" ? "selected" : ""}>Stale 1–24h</option><option value="old" ${this._mapFreshness === "old" ? "selected" : ""}>Old</option></select></div>
-        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}"><ha-icon icon="mdi:vector-polyline" aria-hidden="true"></ha-icon>Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}"><ha-icon icon="mdi:access-point-network" aria-hidden="true"></ha-icon>Neighbor SNR</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit"><ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>Fit</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen"><ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon></button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
+        <div class="map-control-row"><div class="map-control-group layers"><span class="map-control-label">Layers</span><button id="map-topology" class="${this._mapTopology ? "active" : ""}" aria-pressed="${this._mapTopology}"><ha-icon icon="mdi:vector-polyline" aria-hidden="true"></ha-icon>Topology</button><button id="map-neighbors" class="${this._mapNeighbors ? "active" : ""}" aria-pressed="${this._mapNeighbors}"><ha-icon icon="mdi:access-point-network" aria-hidden="true"></ha-icon>Neighbor SNR</button><button id="map-show-home" class="${this._mapShowHome ? "active" : ""}" aria-pressed="${this._mapShowHome}" ${homeLocation(this._hass) ? "" : "disabled"}><ha-icon icon="mdi:home-map-marker" aria-hidden="true"></ha-icon>Show Home</button></div><div class="map-control-group view"><span class="map-control-label">View</span><button id="map-fit"><ha-icon icon="mdi:crosshairs-gps" aria-hidden="true"></ha-icon>Fit</button><button id="map-home" ${homeLocation(this._hass) ? "" : "disabled"}><ha-icon icon="mdi:home" aria-hidden="true"></ha-icon>Home</button><button id="map-fullscreen" class="map-icon-button" aria-label="Toggle fullscreen" title="Toggle fullscreen"><ha-icon icon="mdi:fullscreen" aria-hidden="true"></ha-icon></button><select id="map-style" aria-label="Map style">${MAP_STYLES.map(({value,label}) => `<option value="${value}" ${value === mapStyle.value ? "selected" : ""}>${label}</option>`).join("")}</select></div></div>
         <div class="map-control-group history"><span class="map-control-label">Trail</span><select id="map-position-range" aria-label="Trail time range">${[[1,"1h"],[6,"6h"],[24,"24h"],[72,"3d"],[168,"7d"]].map(([hours,label]) => `<option value="${hours}" ${this._positionRange === hours ? "selected" : ""}>${label}</option>`).join("")}</select>${playback}${clear}</div>
       </div>
       <div class="map-canvas"><div id="mesh-map" class="map ${mapStyle.className}">${state}</div><span class="map-stat">${mapCountLabel(visible, links.length, trailCount)}</span></div>
@@ -1650,6 +1668,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._mapLayer = null;
       this._mapLinkLayer = null;
       this._mapTrailLayer = null;
+      this._mapHomeLayer = null;
     }
   }
 
@@ -1693,6 +1712,7 @@ class MeshMonitorPanel extends HTMLElement {
     this._renderMapLinks();
     this._renderPositionTrail();
     this._renderMapMarkers();
+    this._renderHomeMarker();
     map.on("zoomend", () => this._renderMapMarkers());
   }
 
@@ -1798,6 +1818,29 @@ class MeshMonitorPanel extends HTMLElement {
         this._mapFocusNode = null;
       }
     }
+  }
+
+  _renderHomeMarker() {
+    const map = this._mapInstance;
+    if (!map) return;
+    if (this._mapHomeLayer) this._mapHomeLayer.remove();
+    this._mapHomeLayer = null;
+    const home = homeLocation(this._hass);
+    if (!this._mapShowHome || !home) return;
+    this._mapHomeLayer = window.L.layerGroup().addTo(map);
+    window.L.marker([home.latitude, home.longitude], {
+      pane: "markers",
+      title: home.name,
+      zIndexOffset: 1000,
+      icon: window.L.divIcon({
+        className: "",
+        html: '<div class="map-home-marker"><ha-icon icon="mdi:home"></ha-icon></div>',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      }),
+    })
+      .bindTooltip(escapeHtml(home.name))
+      .addTo(this._mapHomeLayer);
   }
 
   _renderPositionTrail() {
@@ -1945,6 +1988,12 @@ class MeshMonitorPanel extends HTMLElement {
     if (!points.length) return;
     const bounds = window.L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
+  }
+
+  _focusHome() {
+    const home = homeLocation(this._hass);
+    if (!this._mapInstance || !home) return;
+    this._mapInstance.setView([home.latitude, home.longitude], 14);
   }
 
   _nodes(nodes, sources = []) {
@@ -2809,7 +2858,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260823-1752")) {
-  customElements.define("meshmonitor-panel-20260823-1752", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0731")) {
+  customElements.define("meshmonitor-panel-20260829-0731", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
