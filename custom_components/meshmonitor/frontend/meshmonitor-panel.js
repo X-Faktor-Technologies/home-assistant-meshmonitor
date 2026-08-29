@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0731";
+} from "./map-view.js?v=20260829-0748";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -2858,7 +2858,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0731")) {
-  customElements.define("meshmonitor-panel-20260829-0731", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0748")) {
+  customElements.define("meshmonitor-panel-20260829-0748", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

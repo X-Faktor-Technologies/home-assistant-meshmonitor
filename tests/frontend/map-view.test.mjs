@@ -168,7 +168,6 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.match(panel, /id="map-home"/);
   assert.match(panel, /_renderHomeMarker\(\)/);
   assert.match(panel, /_focusHome\(\)/);
-  assert.match(panel, /from "\.\/map-view\.js\?v=20260829-0731"/);
 });
 
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {

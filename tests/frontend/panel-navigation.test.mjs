@@ -80,8 +80,13 @@ test("registered panel element and browser module stay version-aligned", () => {
     "utf8",
   );
   const element = registration.match(/PANEL_ELEMENT = "([^"]+)"/)?.[1];
+  const panelVersion = registration.match(/meshmonitor-panel\.js\?v=([^"]+)"/)?.[1];
+  const mapVersion = panel.match(/from "\.\/map-view\.js\?v=([^"]+)"/)?.[1];
 
   assert.ok(element);
+  assert.ok(panelVersion);
+  assert.equal(element, `meshmonitor-panel-${panelVersion}`);
+  assert.equal(mapVersion, panelVersion);
   assert.match(panel, new RegExp(`customElements\\.get\\("${element}"`));
   assert.match(panel, new RegExp(`customElements\\.define\\("${element}"`));
 });
