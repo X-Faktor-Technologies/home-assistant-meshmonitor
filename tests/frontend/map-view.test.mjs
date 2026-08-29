@@ -181,6 +181,8 @@ test("map controls use theme-neutral surfaces and balanced mobile grids", () => 
   assert.match(panel, /\.map-head \{[^}]*background:var\(--card-background-color\)/);
   assert.match(panel, /\.map-toolbar \{[^}]*background:color-mix\(in srgb,var\(--secondary-background-color\) 46%,var\(--card-background-color\)\)/);
   assert.match(panel, /\.map-toolbar button\.active \{[^}]*var\(--primary-color\) 18%,var\(--card-background-color\)/);
+  assert.match(panel, /\.map-footer \{[^}]*background:var\(--card-background-color\)/);
+  assert.doesNotMatch(panel, /\.map-footer \{[^}]*var\(--primary-color\)/);
   assert.match(panel, /\.map-control-group\.layers\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/);
   assert.match(panel, /\.map-control-group\.layers #map-show-home\{grid-column:1\/-1\}/);
   assert.match(panel, /\.map-control-group\.view\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) 44px minmax\(110px,1\.25fr\)\}/);

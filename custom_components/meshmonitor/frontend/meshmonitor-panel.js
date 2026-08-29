@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0832";
+} from "./map-view.js?v=20260829-0846";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -585,7 +585,7 @@ class MeshMonitorPanel extends HTMLElement {
         .map-state.failed .map-state-label { color:var(--error-color,#ef5350); }
         .map-state h2 { margin:7px 0 8px; font-size:21px; }
         .map-state p { margin:0; line-height:1.5; }
-        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; background:color-mix(in srgb,var(--card-background-color) 96%,var(--primary-color)); }
+        .map-footer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:11px 18px; padding:11px 14px 13px; background:var(--card-background-color); }
         .map-legend { display:flex; align-items:center; gap:7px 14px; flex-wrap:wrap; }
         .map-legend-item { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:12px; }
         .legend-dot { width:9px; height:9px; border-radius:50%; background:currentColor; box-shadow:0 0 0 2px color-mix(in srgb,currentColor 22%,transparent); }
@@ -2859,7 +2859,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0832")) {
-  customElements.define("meshmonitor-panel-20260829-0832", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-0846")) {
+  customElements.define("meshmonitor-panel-20260829-0846", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
