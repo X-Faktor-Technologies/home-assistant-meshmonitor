@@ -124,6 +124,7 @@ def _serialize_node(
         "model": node.hardware_model,
         "firmware": node.firmware_version,
         "favorite": bool(node.is_favorite),
+        "hidden_from_map": node.hidden_from_map is True,
         "ignored": bool(node.raw.get("isIgnored", node.raw.get("is_ignored", False))),
         "device_id": device_id,
         "favorites_enabled": favorites_enabled,
@@ -389,7 +390,10 @@ def _serialize_entry(
         "stale_after_seconds": max(300, scan_interval * 3),
         "node_count": len(snapshot.nodes),
         "positioned_count": sum(
-            node.latitude is not None and node.longitude is not None for node in snapshot.nodes
+            node.latitude is not None
+            and node.longitude is not None
+            and node.hidden_from_map is not True
+            for node in snapshot.nodes
         ),
         "errors": sorted(snapshot.errors),
         "meshmonitor_links": meshmonitor_links,

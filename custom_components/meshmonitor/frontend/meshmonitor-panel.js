@@ -32,6 +32,7 @@ import {
   mapEmptyPresentation,
   mapLayerSummary,
   mapStylePresentation,
+  nodeIsVisibleOnMap,
   persistMapStyle,
   readMapStyle,
 } from "./map-view.js";
@@ -287,7 +288,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _allMapNodes() {
     return (this._data?.sources || []).flatMap((source) => [
-      ...(source.nodes || []),
+      ...(source.nodes || []).filter(nodeIsVisibleOnMap),
       ...(source.protocol === "reticulum"
         ? (source.reticulum?.peers || []).map((peer) => ({
             ...peer,
@@ -1570,7 +1571,13 @@ class MeshMonitorPanel extends HTMLElement {
 
   _nodePositionLookup(source) {
     const positions = new Map();
+    const hidden = new Set(
+      (source.nodes || [])
+        .filter((node) => !nodeIsVisibleOnMap(node))
+        .flatMap((node) => [node.id, node.node_num].flatMap((value) => this._nodeKeys(value))),
+    );
     const add = (node) => {
+      if ([node.id, node.node_num].flatMap((value) => this._nodeKeys(value)).some((key) => hidden.has(key))) return;
       if (node.latitude == null || node.longitude == null) return;
       const point = [Number(node.latitude), Number(node.longitude)];
       if (!point.every(Number.isFinite)) return;
@@ -1586,11 +1593,19 @@ class MeshMonitorPanel extends HTMLElement {
     const links = [];
     for (const source of this._selectedMapSources()) {
       const positions = this._nodePositionLookup(source);
+      const hidden = new Set(
+        (source.nodes || [])
+          .filter((node) => !nodeIsVisibleOnMap(node))
+          .flatMap((node) => [node.id, node.node_num].flatMap((value) => this._nodeKeys(value))),
+      );
+      const isHidden = (value) => this._nodeKeys(value).some((key) => hidden.has(key));
       const resolve = (value) =>
         this._nodeKeys(value).map((key) => positions.get(key)).find(Boolean);
       if (this._mapTopology && source.topology?.state === "supported") {
         for (const edge of source.topology.edges) {
-          const points = [edge.from_id, ...(edge.route || []), edge.to_id]
+          const path = [edge.from_id, ...(edge.route || []), edge.to_id];
+          if (path.some(isHidden)) continue;
+          const points = path
             .map(resolve)
             .filter(Boolean)
             .filter((point, index, values) => index === 0 || point[0] !== values[index - 1][0] || point[1] !== values[index - 1][1]);
@@ -1601,6 +1616,7 @@ class MeshMonitorPanel extends HTMLElement {
       }
       if (this._mapNeighbors && source.neighbors?.state === "supported") {
         for (const link of source.neighbors.links) {
+          if (isHidden(link.from_id ?? link.from_num) || isHidden(link.to_id ?? link.to_num)) continue;
           const directValues = [
             [link.from_latitude, link.from_longitude],
             [link.to_latitude, link.to_longitude],

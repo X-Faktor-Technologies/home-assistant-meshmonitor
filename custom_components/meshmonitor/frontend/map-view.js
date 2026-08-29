@@ -7,6 +7,8 @@ export const MAP_STYLES = Object.freeze([
 
 const MAP_STYLE_VALUES = new Set(MAP_STYLES.map(({ value }) => value));
 
+export const nodeIsVisibleOnMap = (node) => node?.hidden_from_map !== true;
+
 export const normalizeMapStyle = (value, legacyPrivacy = null) => {
   if (MAP_STYLE_VALUES.has(value)) return value;
   return legacyPrivacy === "true" ? "tiles-off" : "neutral-dark";

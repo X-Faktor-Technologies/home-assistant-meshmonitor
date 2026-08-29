@@ -75,7 +75,10 @@ export const overviewSummary = (sources = [], nodes = [], now = Date.now()) => {
     return age !== null && age >= 0 && age <= 60 * 60 * 1000;
   }).length;
   const positioned = nodes.filter(
-    (node) => node.latitude != null && node.longitude != null,
+    (node) =>
+      node.hidden_from_map !== true &&
+      node.latitude != null &&
+      node.longitude != null,
   ).length;
   const protocols = [...new Set(sources.map((source) => source.protocol).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));

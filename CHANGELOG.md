@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Honor MeshMonitor's persisted Hide from Map preference in map markers,
+  topology and neighbor overlays, fit bounds, and positioned-node counts while
+  keeping the node available in Nodes and Home Assistant entities.
+
 ## 0.16.0
 
 - Promote the clean-install-tested public beta to the first stable release so

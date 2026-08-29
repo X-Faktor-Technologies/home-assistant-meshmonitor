@@ -8,6 +8,7 @@ import {
   mapEmptyPresentation,
   mapLayerSummary,
   mapStylePresentation,
+  nodeIsVisibleOnMap,
   persistMapStyle,
   readMapStyle,
 } from "../../custom_components/meshmonitor/frontend/map-view.js";
@@ -27,6 +28,12 @@ const empty = (overrides = {}) => ({
 test("map counts use concise deterministic plurals", () => {
   assert.equal(mapCountLabel(1, 0, 1), "1 node · 0 links · 1 fix");
   assert.equal(mapCountLabel(6, 5, 0), "6 nodes · 5 links");
+});
+
+test("MeshMonitor-hidden nodes are excluded only from map presentation", () => {
+  assert.equal(nodeIsVisibleOnMap({ hidden_from_map: true }), false);
+  assert.equal(nodeIsVisibleOnMap({ hidden_from_map: false }), true);
+  assert.equal(nodeIsVisibleOnMap({}), true);
 });
 
 test("map lifecycle states distinguish loading, failure, filters, and no positions", () => {
@@ -109,6 +116,9 @@ test("map polish includes Reticulum positions, clear filters, and accessible ico
   assert.match(panel, /mdi:filter-remove-outline/);
   assert.match(panel, /mdi:crosshairs-gps/);
   assert.match(panel, /--protocol-reticulum/);
+  assert.match(panel, /\.filter\(nodeIsVisibleOnMap\)/);
+  assert.match(panel, /path\.some\(isHidden\)/);
+  assert.match(panel, /isHidden\(link\.from_id/);
 });
 
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {

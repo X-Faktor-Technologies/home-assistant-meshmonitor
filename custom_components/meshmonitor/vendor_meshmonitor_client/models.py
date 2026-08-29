@@ -192,6 +192,12 @@ class Node:
     is_favorite: bool | None
     raw: Mapping[str, Any] = field(repr=False)
 
+    @property
+    def hidden_from_map(self) -> bool | None:
+        """Return MeshMonitor's local map-visibility preference when present."""
+        value = _first(self.raw, "hideFromMap", "hide_from_map")
+        return value if isinstance(value, bool) else None
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Node:
         node_id = _first(data, "id", "nodeId", "node_id", "num")
