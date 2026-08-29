@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MeshMonitorSourceRuntime
 from .const import SOURCE_TYPE_MESHCORE, SOURCE_TYPE_RETICULUM
 from .coordinator import MeshMonitorCoordinator
-from .entity_policy import is_source_node
+from .entity_policy import is_source_node, node_entities_enabled
 from .registry import (
     node_device_identifier,
     node_entity_unique_id,
@@ -69,6 +70,7 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
         super().__init__(coordinator)
         self.source = source
         self.node_id = node.id
+        self._removal_requested = False
         fingerprint = server_fingerprint(source.data["url"])
         self._attr_unique_id = node_entity_unique_id(fingerprint, source.source_id, node.id, key)
         self._attr_device_info = node_device_info(source, node)
@@ -82,3 +84,21 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
     def available(self) -> bool:
         """Mark a node entity unavailable if it vanishes or refresh fails."""
         return super().available and self.node is not None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Retire entities removed by an authoritative successful snapshot."""
+        node = self.node
+        if (
+            self.coordinator.last_update_success
+            and (node is None or not node_entities_enabled(self.source, node))
+        ):
+            if not self._removal_requested:
+                self._removal_requested = True
+                self.hass.async_create_task(
+                    self.async_remove(force_remove=True),
+                    f"Remove retired MeshMonitor node entity {self.unique_id}",
+                    eager_start=True,
+                )
+            return
+        super()._handle_coordinator_update()
