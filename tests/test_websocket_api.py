@@ -749,7 +749,7 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
     client = Mock()
     client.set_meshtastic_favorite = AsyncMock(return_value=None)
     coordinator = SimpleNamespace(
-        async_request_refresh=AsyncMock(), async_update_listeners=Mock()
+        async_request_refresh=AsyncMock(), async_set_node_favorite=Mock()
     )
     server_entry = SimpleNamespace(
         entry_id="entry-1",
@@ -798,7 +798,7 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
         "source-1", "remote", False
     )
     coordinator.async_request_refresh.assert_awaited_once_with()
-    coordinator.async_update_listeners.assert_called_once_with()
+    coordinator.async_set_node_favorite.assert_called_once_with("remote", False)
     reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
     wait_for_removal.assert_awaited_once_with(
         hass,

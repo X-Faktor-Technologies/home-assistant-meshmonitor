@@ -32,6 +32,7 @@ from custom_components.meshmonitor.const import (
     NODE_DEVICE_POLICY_ALL,
     NODE_DEVICE_POLICY_FAVORITES,
 )
+from custom_components.meshmonitor.coordinator import MeshMonitorCoordinator
 from custom_components.meshmonitor.entity import async_add_node_entities
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
@@ -104,6 +105,33 @@ async def test_dynamic_discovery_waits_for_matching_entity_removal(
     gate.set()
     await hass.async_block_till_done()
     assert added == [entity]
+
+
+async def test_confirmed_favorite_write_updates_coordinator_memory(
+    hass: HomeAssistant,
+) -> None:
+    """A confirmed write bypasses a temporarily stale follow-up API snapshot."""
+    node = Node.from_dict({"id": "node-1", "isFavorite": False})
+    snapshot = SourceSnapshot.create(
+        "source-a",
+        SourceStatus.from_dict({"connected": True, "localNodeId": "local"}),
+        [node],
+        None,
+        [],
+        {},
+    )
+    coordinator = MeshMonitorCoordinator(
+        hass, Mock(), "source-a", "meshcore"
+    )
+    coordinator.async_set_updated_data(snapshot)
+    listener = Mock()
+    coordinator.async_add_listener(listener)
+
+    coordinator.async_set_node_favorite("node-1", True)
+
+    assert coordinator.nodes["node-1"].is_favorite is True
+    assert coordinator.nodes["node-1"].raw["isFavorite"] is True
+    listener.assert_called_once_with()
 
 
 async def test_setup_serializes_sources_keeps_failed_sibling_and_creates_sources(
