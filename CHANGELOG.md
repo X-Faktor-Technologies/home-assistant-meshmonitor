@@ -4,6 +4,8 @@
 
 - Prevent duplicate Home Assistant device-tracker discovery when a node's
   coordinates temporarily disappear and later return.
+- Keep received and sent MeshCore direct messages in one conversation when
+  MeshMonitor stores the received sender as an unambiguous public-key prefix.
 - Reconcile Home Assistant node devices against successful MeshMonitor source
   snapshots so explicitly deleted nodes disappear in place, and update favorite
   membership without reloading the full integration or panel.

@@ -244,6 +244,59 @@ async def test_source_histories_are_enriched_merged_and_ordered(
     )
 
 
+async def test_meshcore_message_key_prefix_expands_to_contact_identity(
+    hass: HomeAssistant,
+) -> None:
+    remote_key = "a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123"
+    local_key = "d4e5f60718290123456789abcdef0123456789abcdef0123456789abcdef0123"
+    incoming = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "mc:source-1:incoming",
+            "fromPublicKey": remote_key[:12],
+            "toPublicKey": local_key,
+            "text": "Reply",
+            "timestamp": 1_770_000_001_000,
+            "receptions": [{"sourceId": "source-1", "sourceType": "meshcore"}],
+        }
+    )
+    outgoing = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "mc:source-1:outgoing",
+            "fromPublicKey": local_key,
+            "toPublicKey": remote_key,
+            "text": "Test",
+            "timestamp": 1_770_000_000_000,
+            "receptions": [{"sourceId": "source-1", "sourceType": "meshcore"}],
+        }
+    )
+    client = Mock()
+    client.get_meshcore_messages = AsyncMock(return_value=[incoming, outgoing])
+    snapshot = Mock(
+        channels=[],
+        nodes=[
+            SimpleNamespace(id=local_key, long_name="Local", short_name=None),
+            SimpleNamespace(id=remote_key, long_name="Remote", short_name=None),
+        ],
+        status=Mock(local_node_id=local_key),
+    )
+    source = MessageSource(
+        client,
+        "source-1",
+        "MeshCore",
+        "meshcore",
+        Mock(data=snapshot),
+    )
+    coordinator = MeshMonitorMessageCoordinator(hass, (source,), "http://mesh.test")
+
+    result = await coordinator._async_update_data()
+
+    assert len(result) == 2
+    by_id = {message.id: message for message in result}
+    assert by_id["mc:source-1:incoming"].from_id == remote_key
+    assert by_id["mc:source-1:incoming"].from_name == "Remote"
+    assert by_id["mc:source-1:outgoing"].to_id == remote_key
+
+
 async def test_duplicate_meshtastic_receptions_collapse_to_one_message(
     hass: HomeAssistant,
 ) -> None:
