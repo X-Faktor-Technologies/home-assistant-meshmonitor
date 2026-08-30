@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-1910";
+} from "./map-view.js?v=20260829-2258";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -833,7 +833,7 @@ class MeshMonitorPanel extends HTMLElement {
           .message-identity { align-items:flex-start; flex-direction:column; gap:3px; }
           .reply-state { display:none; }
         }
-        @media(max-width:760px){.conversation-shell{height:calc(100dvh - 92px);min-height:0;max-height:none;display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto;padding-bottom:max(10px,env(safe-area-inset-bottom))}.compose-top{align-items:flex-start;flex-direction:column}.compose-top label,.compose-top select{width:100%;max-width:none}.compose-route{width:100%;white-space:normal;overflow-wrap:anywhere}.compose-body{grid-template-columns:1fr}.compose-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1fr);align-items:center;justify-items:stretch}.compose-action #compose-send{width:100%;min-height:44px}.compose-count{text-align:left}.send-review-grid{grid-template-columns:1fr}}
+        @media(max-width:760px){.conversation-shell{height:100%;min-height:0;max-height:none;display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto;padding:7px 10px max(7px,env(safe-area-inset-bottom))}.compose-top{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin-bottom:5px}.compose-top label{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:6px;width:100%}.compose-top select{width:100%;max-width:none;min-height:36px}.compose-route{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compose-body{grid-template-columns:1fr;gap:6px}.compose textarea{min-height:44px;max-height:96px;padding:7px 9px}.compose-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1fr);align-items:center;justify-items:stretch}.compose-action #compose-send{width:100%;min-height:44px}.compose-count{text-align:left}.compose-note{display:none}.send-review-grid{grid-template-columns:1fr}}
         @media(prefers-reduced-motion:reduce){.leaflet-fade-anim .leaflet-popup,.leaflet-zoom-anim .leaflet-zoom-animated{transition:none!important}}
       </style>
       ${this._error ? `<div class="error">${escapeHtml(this._error)}</div>` : ""}
@@ -2822,7 +2822,7 @@ class MeshMonitorPanel extends HTMLElement {
     const reply = this._replyContext
       ? `<div class="reply-context"><strong>Replying to ${escapeHtml(this._replyContext.sender)}</strong><span>${escapeHtml(this._replyContext.body)}</span><button id="cancel-reply-context" aria-label="Cancel quoted reply context">×</button></div>`
       : "";
-    return `<section class="compose" aria-label="Message composer"><div class="compose-top"><label>Send via <select id="compose-source" aria-label="Exact outbound source">${enabled.map(({source:item}) => `<option value="${escapeHtml(sourceSelectionKey(item))}" ${sourceSelectionKey(item) === this._composeSource ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.source_id)}</option>`).join("")}</select></label><span class="compose-route" title="${escapeHtml(destination)}">${escapeHtml(conversation.protocol)} · ${escapeHtml(destination)}</span></div>${reply}<div class="compose-body"><textarea id="compose-text" aria-label="Message body" placeholder="Write a message. Enter adds a new line; it never sends.">${escapeHtml(this._composeText)}</textarea><div class="compose-action"><span id="compose-count" class="compose-count muted">${validation.bytes} / ${validation.limit} bytes</span><button id="compose-send" ${this._sending || !validation.valid ? "disabled" : ""}>${this._sending ? "Sending…" : "Send"}</button></div></div>${this._sendStatus ? `<div class="send-status ${this._sendStatusAmbiguous ? "ambiguous" : ""}" role="status" aria-live="polite">${escapeHtml(this._sendStatus)}</div>` : ""}<div class="muted" style="margin-top:5px;font-size:9px">A check means the outgoing message appeared in stored MeshMonitor history; it does not prove radio delivery. No automatic retries.</div></section>`;
+    return `<section class="compose" aria-label="Message composer"><div class="compose-top"><label>Send via <select id="compose-source" aria-label="Exact outbound source">${enabled.map(({source:item}) => `<option value="${escapeHtml(sourceSelectionKey(item))}" ${sourceSelectionKey(item) === this._composeSource ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.source_id)}</option>`).join("")}</select></label><span class="compose-route" title="${escapeHtml(destination)}">${escapeHtml(conversation.protocol)} · ${escapeHtml(destination)}</span></div>${reply}<div class="compose-body"><textarea id="compose-text" aria-label="Message body" placeholder="Write a message. Enter adds a new line; it never sends.">${escapeHtml(this._composeText)}</textarea><div class="compose-action"><span id="compose-count" class="compose-count muted">${validation.bytes} / ${validation.limit} bytes</span><button id="compose-send" ${this._sending || !validation.valid ? "disabled" : ""}>${this._sending ? "Sending…" : "Send"}</button></div></div>${this._sendStatus ? `<div class="send-status ${this._sendStatusAmbiguous ? "ambiguous" : ""}" role="status" aria-live="polite">${escapeHtml(this._sendStatus)}</div>` : ""}<div class="compose-note muted">A check means the outgoing message appeared in stored MeshMonitor history; it does not prove radio delivery. No automatic retries.</div></section>`;
   }
 
   async _sendMessage() {
@@ -2915,7 +2915,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-1910")) {
-  customElements.define("meshmonitor-panel-20260829-1910", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260829-2258")) {
+  customElements.define("meshmonitor-panel-20260829-2258", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
