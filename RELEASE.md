@@ -17,8 +17,10 @@ does not publish anything by itself.
   [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 - [ ] Confirm the default-branch validation workflow passes at the release commit.
 - [ ] Confirm the `release` GitHub environment requires maintainer approval,
-  `main` and `v*` rulesets prevent force-push/tag movement, and immutable
-  releases are enabled where GitHub makes the setting available.
+  `main` is protected, and the `v*` ruleset restricts tag creation to the
+  environment-approved release automation identity while blocking tag updates
+  and deletion. Enable immutable releases where GitHub makes the setting
+  available.
 
 ## Publish
 

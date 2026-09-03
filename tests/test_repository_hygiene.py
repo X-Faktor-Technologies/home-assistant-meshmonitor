@@ -181,6 +181,8 @@ def test_external_link_policy_rejects_nonpublic_destinations() -> None:
     private_address = ".".join(("192", "168", "10", "4"))
     assert public_url_problem(f"http://{private_address}/status") is not None
     assert public_url_problem("http://[::1]/status") is not None
+    assert public_url_problem("http://100.64.0.1/status") is not None
+    assert public_url_problem("http://[fec0::1]/status") is not None
     credential_url = "https://user:" + "password@example.com/"
     assert public_url_problem(credential_url) is not None
 

@@ -45,7 +45,8 @@ def test_release_metadata_and_workflow_stay_aligned() -> None:
     assert "actions/download-artifact@" in release_workflow
     assert "RELEASE_TAG: ${{ inputs.tag }}" in release_workflow
     assert 'metadata --tag "${RELEASE_TAG}"' in release_workflow
-    assert "github.rest.git.createRef" in release_workflow
+    assert "group: release" in release_workflow
+    assert "cancel-in-progress: false" in release_workflow
     assert "tag_name: ${{ inputs.tag }}" in release_workflow
     assert "target_commitish: ${{ github.sha }}" in release_workflow
     assert "prerelease: ${{ contains(inputs.tag, '-') }}" in release_workflow

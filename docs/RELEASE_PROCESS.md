@@ -57,6 +57,12 @@ workflow refuses non-`main` refs, stale commits, and existing tags. It then:
 - creates the new tag and a draft containing both files only after every
   preceding job succeeds and the protected `release` environment is approved.
 
+Before enabling this workflow, install a ruleset for `refs/tags/v*` that
+restricts creation to the environment-approved release automation identity and
+blocks updates and deletion. This is mandatory because historical commits may
+contain older tag-triggered workflows; current workflow code cannot retroactively
+change them.
+
 Review the draft, checksum, provenance, and generated notes. Publishing the
 draft is a separate maintainer action and approval gate. Do not move a
 published tag or replace a published archive. Correct a release with a new

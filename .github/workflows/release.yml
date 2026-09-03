@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   validation:
     if: github.ref == 'refs/heads/main'
@@ -61,18 +65,6 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-payload-${{ github.sha }}
-      - name: Create the exact validated tag
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        with:
-          script: |
-            await github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `refs/tags/${process.env.RELEASE_TAG}`,
-              sha: context.sha,
-            });
       - name: Attest HACS archive provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
