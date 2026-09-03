@@ -55,6 +55,12 @@ You can:
 - mark conversations as read; and
 - send a message when outbound messages are enabled.
 
+Opening a conversation starts at its newest message. While you are reading
+older history, background refreshes preserve your position and a **Scroll to
+latest** control appears when newer content is below the viewport. While you
+are composing, refreshes preserve the draft, caret, focus, and keyboard. Short
+messages use compact bubbles; longer messages wrap to the available width.
+
 Pins, mutes, filters, and read markers stay in that browser. They do not change
 MeshMonitor and do not follow you to another computer or phone.
 
@@ -79,8 +85,9 @@ Sending is hidden until all required safeguards are enabled:
 3. The MeshMonitor API user must have `messages:write`.
 4. MeshCore also requires its transmit setting to be enabled in MeshMonitor.
 
-Choose the destination, type the message, review it, and send. If the result is
-unclear because of a timeout, check the conversation before trying again. The
+Choose the destination, type the message, review it, and send. A successful
+send returns the conversation to its newest message. If the result is unclear
+because of a timeout, check the conversation before trying again. The
 integration does not automatically resend an uncertain transmission.
 
 ## Nodes

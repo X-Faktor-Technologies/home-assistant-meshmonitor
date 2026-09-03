@@ -12,10 +12,11 @@ or radio.
 ## Required tools
 
 - Git.
-- CPython 3.12 or newer, with `venv` and `pip`. Python 3.12 matches the
-  project's configured minimum and type-checking target.
-- Node.js. The frontend is committed as plain JavaScript, so Node is used for
-  a syntax check rather than a package install or bundle step.
+- CPython 3.12 or newer, with `venv` and `pip`. Python 3.12 is the runtime
+  minimum; continuous integration currently performs strict type checking with
+  Python 3.13.
+- Node.js 24. The frontend is committed as plain JavaScript; the locked npm
+  dependency is used only for Markdown linting, not for bundling frontend code.
 
 Installing the Home Assistant test dependency can require several hundred
 megabytes. On platforms without compatible wheels, a compiler and the system
@@ -50,31 +51,34 @@ repository root:
 
 ```bash
 .venv/bin/pytest
-.venv/bin/ruff check custom_components tests
+.venv/bin/ruff check custom_components scripts tests
+.venv/bin/mypy custom_components/meshmonitor
+.venv/bin/python -m compileall -q custom_components/meshmonitor
+.venv/bin/python scripts/repository_checks.py hygiene
+.venv/bin/python scripts/repository_checks.py metadata
+.venv/bin/python scripts/repository_checks.py links
+.venv/bin/python scripts/repository_checks.py screenshots
+npm ci --ignore-scripts
+npm audit --audit-level=high
+npx --no-install markdownlint-cli2
 node --check custom_components/meshmonitor/frontend/meshmonitor-panel.js
 node --test tests/frontend/*.test.mjs
 git diff --check
 ```
 
-Pytest should report 212 passing tests and the Node runner should report 99
-passing frontend tests in the current tree. The Python suite blocks
-unexpected socket use, and all MeshMonitor client interactions are mocked, so
-these commands must not contact a live mesh service. Run a focused test during
-development with, for example:
+The Python suite blocks unexpected socket use, and all MeshMonitor client
+interactions are mocked, so these commands must not contact a live mesh
+service. Run a focused test during development with, for example:
 
 ```bash
 .venv/bin/pytest tests/test_websocket_api.py -k position_history
 ```
 
-For a low-cost Python syntax check independent of pytest:
-
-```bash
-.venv/bin/python -m compileall -q custom_components tests
-```
-
-Hassfest and HACS validation run in CI. Before publication, the release plan
-also requires clean-install, upgrade, rollback, removal, privacy, link, secret,
-and live-lab checks; the unit suite is not a substitute for those gates.
+Hassfest and HACS validation run in CI. External links run in a separate
+scheduled workflow with retries so remote outages do not make pull requests
+nondeterministic. Before publication, review its latest result and follow the
+clean-install, upgrade, rollback, removal, and privacy gates in the
+[release process](RELEASE_PROCESS.md).
 
 ## Type checking
 
@@ -153,3 +157,18 @@ radio/configuration administration do not belong in this integration.
 Before sharing logs, snapshots, screenshots, coverage artifacts, or failure
 output, review them using the privacy checklist in
 [`PRIVACY_THREAT_MODEL.md`](PRIVACY_THREAT_MODEL.md).
+
+## Documentation and screenshots
+
+Write public documentation for users and maintainers, not for a private
+deployment. Repository links must be relative and pass the local link checker;
+external links should use canonical HTTPS destinations. Markdown must pass the
+committed lint configuration.
+
+Screenshots must show synthetic or irreversibly sanitized data. Before adding
+or replacing one, inspect visible content and image metadata for names, host or
+network details, node identifiers, coordinates, messages, tokens, and unrelated
+browser or desktop content. Update [`images/README.md`](images/README.md) with
+the image purpose, sanitization/provenance statement, and SHA-256 digest. A
+frontend change that affects layout still needs desktop and mobile review even
+when its dependency-free tests pass.

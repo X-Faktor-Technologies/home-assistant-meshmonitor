@@ -41,15 +41,25 @@ The routine local checks are:
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -e '.[test]'
 .venv/bin/pytest
-.venv/bin/ruff check custom_components tests
+.venv/bin/ruff check custom_components scripts tests
+.venv/bin/mypy custom_components/meshmonitor
+.venv/bin/python scripts/repository_checks.py hygiene
+.venv/bin/python scripts/repository_checks.py metadata
+.venv/bin/python scripts/repository_checks.py links
+.venv/bin/python scripts/repository_checks.py screenshots
+npm ci --ignore-scripts
+npm audit --audit-level=high
+npx --no-install markdownlint-cli2
 node --check custom_components/meshmonitor/frontend/meshmonitor-panel.js
 node --test tests/frontend/*.test.mjs
 git diff --check
 ```
 
-Strict mypy currently has a documented Home Assistant export limitation. Run
-and assess it as described in `docs/DEVELOPMENT.md`; do not hide new failures
-with broad ignores.
+These repository checks inspect tracked files and non-ignored untracked files.
+Do not add AI-assistant or internal workflow material, symlinks, generated
+caches, archives, databases, logs, backups, private host paths or network
+addresses, or credential-like content. Use reserved example domains and
+plainly synthetic fixture values.
 
 ## Privacy, safety, and implementation rules
 
@@ -57,6 +67,13 @@ Never commit tokens, authorization headers, cookies, raw API responses,
 message bodies, channel secrets, node identities, source identities, private
 service addresses, or real coordinates. Fixtures, logs, screenshots, and
 examples must be synthetic or irreversibly sanitized.
+
+Documentation links must be relative when they target repository content and
+must resolve locally. Use stable canonical URLs for external references. New or
+updated screenshots require a focused visual review for names, identifiers,
+addresses, coordinates, messages, browser chrome, and embedded metadata. Record
+their synthetic-data provenance and SHA-256 digest in
+[`docs/images/README.md`](docs/images/README.md).
 
 Public functions and non-obvious lifecycle code need concise docstrings or
 comments. Explain why a privacy, permission, scheduling, ownership, or

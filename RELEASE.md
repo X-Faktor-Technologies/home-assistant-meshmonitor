@@ -1,35 +1,45 @@
 # Release checklist
 
-Follow the staged [release process](docs/RELEASE_PROCESS.md). Each publication
-or promotion step requires its own explicit owner approval; completing an
-earlier section does not authorize a later one. Substitute the exact reviewed
-metadata version wherever `<client-version>` or `<integration-version>` appears.
+Use this checklist with the detailed [release process](docs/RELEASE_PROCESS.md).
+Publishing requires explicit maintainer approval; a successful build or test run
+does not publish anything by itself.
 
-## GitHub publication
+## Prepare
 
-- [ ] Confirm the exact GitHub owner/repository names.
-- [ ] Export a sanitized, tracked-file-only client snapshot with no internal `.git` history.
-- [ ] Create `elier/python-meshmonitor` and push one reviewed initial commit.
-- [ ] Confirm client CI passes on Python 3.12, 3.13, and 3.14.
-- [ ] Enable private vulnerability reporting.
-- [ ] Export a sanitized, tracked-file-only integration snapshot with no internal `.git` history.
-- [ ] Create `elier/home-assistant-meshmonitor` and push one reviewed initial commit.
-- [ ] Confirm tests, Hassfest, and HACS validation pass.
+- [ ] Choose the candidate version without reusing a published version or tag.
+- [ ] Move the completed `Unreleased` entries under that exact version in
+  `CHANGELOG.md`, leaving an empty `Unreleased` section above it.
+- [ ] Set the same version in `custom_components/meshmonitor/manifest.json` and
+  `pyproject.toml`.
+- [ ] Review user documentation, compatibility requirements, and release notes.
+- [ ] Confirm fixtures and screenshots are synthetic or irreversibly sanitized.
+- [ ] Run every command in the local validation section of
+  [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+- [ ] Confirm the default-branch validation workflow passes at the release commit.
+- [ ] Confirm the `release` GitHub environment requires maintainer approval,
+  `main` and `v*` rulesets prevent force-push/tag movement, and immutable
+  releases are enabled where GitHub makes the setting available.
 
-## Package and integration release
+## Publish
 
-- [ ] Configure PyPI trusted publishing for `meshmonitor-api-client`.
-- [ ] Publish client `<client-version>` and verify its wheel on ARM64.
-- [ ] Replace the vendored client with the exact pinned PyPI requirement.
-- [ ] Test a clean HAOS install with no pre-populated `/config/deps`.
-- [ ] Tag integration `v<integration-version>` and verify the attached
-      `meshmonitor.zip` checksum and contents.
-- [ ] Test HACS install, upgrade, rollback, and removal.
+- [ ] Obtain approval to dispatch the release workflow from the exact current
+  `main` commit with the new `v<version>` tag input.
+- [ ] Confirm that tag does not already exist; never move or replace a tag.
+- [ ] Confirm the release workflow reruns tests, Hassfest, HACS validation,
+  documentation checks, and repository hygiene before publication.
+- [ ] Review the generated draft release; the workflow must not publish it.
+- [ ] Confirm the draft contains `meshmonitor.zip` and `SHA256SUMS`.
+- [ ] Verify the archive checksum and GitHub artifact provenance attestation.
+- [ ] Obtain separate maintainer approval before publishing the reviewed draft.
 
-## Promotion gates
+## Verify
 
-- [ ] Complete a 24-hour lab soak with recorder/request-rate measurements.
-- [ ] Rotate a token and validate reauthentication end to end.
-- [ ] Observe or approve one controlled real message test.
-- [ ] Audit diagnostics and logs for sensitive-data leakage.
-- [ ] Keep production Home Assistant untouched until every gate passes.
+- [ ] Install the release through HACS in an authorized test environment.
+- [ ] Verify a clean install, upgrade from the previous supported release,
+  rollback, and removal.
+- [ ] Confirm setup, entities, panel views, and documented opt-in actions behave
+  as described without exposing credentials or private mesh data.
+- [ ] Record only sanitized results and the tested versions.
+
+If any check fails, stop. Fix the issue on the default branch and use a new
+version and tag when the failed release was already published.

@@ -9,3 +9,15 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+.DS_Store
+.env
+.env.*
+.idea/
+.vscode/
+node_modules/
+coverage.xml
+junit*.xml
+*.log
+*.sqlite*
+*.bak
+*.tmp
