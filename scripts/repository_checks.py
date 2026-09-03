@@ -466,7 +466,9 @@ def _external_urls(root: Path) -> set[str]:
     return urls
 
 
-def _public_addresses(url: str) -> tuple[list[ipaddress.IPv4Address | ipaddress.IPv6Address], str | None]:
+def _public_addresses(
+    url: str,
+) -> tuple[list[ipaddress.IPv4Address | ipaddress.IPv6Address], str | None]:
     """Resolve a URL once and return only verified public destination addresses."""
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -639,7 +641,8 @@ def release_metadata_problems(root: Path, tag: str | None = None) -> list[str]:
         for identifier in manifest_version.split("-", 1)[1].split("."):
             if identifier.isdigit() and len(identifier) > 1 and identifier.startswith("0"):
                 problems.append(
-                    f"manifest version {manifest_version!r} has a leading-zero prerelease identifier"
+                    f"manifest version {manifest_version!r} has a leading-zero "
+                    "prerelease identifier"
                 )
                 break
     if not re.search(
