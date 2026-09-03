@@ -348,18 +348,16 @@ test("outbound history never becomes unread", () => {
   assert.equal(presentation.unread, false);
 });
 
-test("timer refresh deferral protects composer engagement across an in-flight refresh", async () => {
+test("timer refresh deferral protects live composer engagement", async () => {
   let composerEngagedAtCompletion = false;
   const refresh = Promise.resolve().then(() => {
     composerEngagedAtCompletion = true;
   });
-  const composerFocusedAtStart = false;
   await refresh;
 
   assert.equal(
     shouldDeferMessagesRender({
       background: true,
-      composerFocusedAtStart,
       composerEngagedAtCompletion,
       messagePointerActive: false,
     }),
@@ -368,17 +366,11 @@ test("timer refresh deferral protects composer engagement across an in-flight re
   );
   assert.equal(shouldDeferMessagesRender({
     background: true,
-    composerFocusedAtStart: true,
-    composerEngagedAtCompletion: false,
-  }), true, "focus present at refresh start remains protected after blur");
-  assert.equal(shouldDeferMessagesRender({
-    background: true,
     messagePointerActive: true,
   }), true, "pointerdown through click must not be interrupted by a refresh render");
   assert.equal(
     shouldDeferMessagesRender({
       background: true,
-      composerFocusedAtStart: false,
       composerEngagedAtCompletion: false,
     }),
     false,
@@ -386,7 +378,6 @@ test("timer refresh deferral protects composer engagement across an in-flight re
   assert.equal(
     shouldDeferMessagesRender({
       background: false,
-      composerFocusedAtStart: true,
       composerEngagedAtCompletion: true,
     }),
     false,
@@ -397,12 +388,9 @@ test("timer refresh deferral protects composer engagement across an in-flight re
     "utf8",
   );
   assert.match(panel, /this\._load\(\{ background: true \}\)/);
-  const capture = panel.indexOf("const composerFocusedAtStart =");
   const request = panel.indexOf("await this._hass.callWS({ type: \"meshmonitor/panel\" })");
   const finallyPath = panel.indexOf("} finally {", request);
-  assert.ok(capture >= 0 && capture < request, "focus is captured before the request awaits");
   assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
-  assert.match(panel, /this\.shadowRoot\?\.activeElement\?\.id === "compose-text"/);
   assert.match(panel, /composerEngagedAtCompletion:\s+this\.shadowRoot\?\.activeElement\?\.closest\?\.\("\.compose"\) != null/);
   assert.match(panel, /messagePointerActive: this\._messagePointerActive/);
   assert.match(panel, /else if \(shouldDeferMessagesRender\(\{/);

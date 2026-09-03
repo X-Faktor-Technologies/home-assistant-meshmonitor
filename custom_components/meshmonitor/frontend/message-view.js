@@ -229,12 +229,10 @@ export const sortMessagesChronologically = (messages) =>
 
 export const shouldDeferMessagesRender = ({
   background = false,
-  composerFocusedAtStart = false,
   composerEngagedAtCompletion = false,
   messagePointerActive = false,
 } = {}) =>
   background && (
-    composerFocusedAtStart ||
     composerEngagedAtCompletion ||
     messagePointerActive
   );

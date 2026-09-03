@@ -278,8 +278,6 @@ class MeshMonitorPanel extends HTMLElement {
 
   async _load({ background = false } = {}) {
     if (!this._hass || this._loading) return;
-    const composerFocusedAtStart =
-      this.shadowRoot?.activeElement?.id === "compose-text";
     const refreshMapInPlace = this._tab === "map" && Boolean(this._mapInstance);
     this._loading = true;
     if (!this._data) this._render();
@@ -297,7 +295,6 @@ class MeshMonitorPanel extends HTMLElement {
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
       else if (shouldDeferMessagesRender({
         background: background && this._tab === "messages",
-        composerFocusedAtStart,
         composerEngagedAtCompletion:
           this.shadowRoot?.activeElement?.closest?.(".compose") != null,
         messagePointerActive: this._messagePointerActive,
