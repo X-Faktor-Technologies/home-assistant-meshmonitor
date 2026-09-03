@@ -17,9 +17,10 @@ import {
   messageTimelineRestorePosition,
   messagesInConversation,
   shouldDeferMessagesRender,
+  shouldFlushDeferredMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
-  wireComposerInteractionGuard,
+  wireMessageInteractionGuard,
 } from "../../custom_components/meshmonitor/frontend/message-view.js";
 
 const SOURCE = {
@@ -360,7 +361,7 @@ test("timer refresh deferral protects composer engagement across an in-flight re
       background: true,
       composerFocusedAtStart,
       composerEngagedAtCompletion,
-      composerPointerActive: false,
+      messagePointerActive: false,
     }),
     true,
     "focus acquired while a refresh is in flight must prevent destructive rendering",
@@ -372,7 +373,7 @@ test("timer refresh deferral protects composer engagement across an in-flight re
   }), true, "focus present at refresh start remains protected after blur");
   assert.equal(shouldDeferMessagesRender({
     background: true,
-    composerPointerActive: true,
+    messagePointerActive: true,
   }), true, "pointerdown through click must not be interrupted by a refresh render");
   assert.equal(
     shouldDeferMessagesRender({
@@ -403,23 +404,24 @@ test("timer refresh deferral protects composer engagement across an in-flight re
   assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
   assert.match(panel, /this\.shadowRoot\?\.activeElement\?\.id === "compose-text"/);
   assert.match(panel, /composerEngagedAtCompletion:\s+this\.shadowRoot\?\.activeElement\?\.closest\?\.\("\.compose"\) != null/);
-  assert.match(panel, /composerPointerActive: this\._composerPointerActive/);
+  assert.match(panel, /messagePointerActive: this\._messagePointerActive/);
   assert.match(panel, /else if \(shouldDeferMessagesRender\(\{/);
   const loadFinally = panel.slice(finallyPath, panel.indexOf("\n  _allNodes()", finallyPath));
   assert.match(loadFinally, /activeElement/);
   assert.match(panel, /_render\(\) \{\s+if \(!this\.shadowRoot\) return;\s+this\._deferredMessagesRender = false;/);
   assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
   assert.doesNotMatch(panel, /addEventListener\("blur"/);
-  assert.match(panel, /wireComposerInteractionGuard\(composer, \(active\) => \{/);
+  assert.match(panel, /_flushDeferredMessagesRender\(\)/);
+  assert.match(panel, /composer\?\.addEventListener\("focusout"/);
 });
 
-test("composer pointer guard protects Send until click delivery", () => {
+test("message pointer guard protects activation until click delivery", () => {
   const composer = new EventTarget();
   const releaseTarget = new EventTarget();
   const scheduled = [];
   let pointerActive = false;
   let clickDelivered = false;
-  wireComposerInteractionGuard(
+  wireMessageInteractionGuard(
     composer,
     (active) => { pointerActive = active; },
     (callback) => scheduled.push(callback),
@@ -431,7 +433,7 @@ test("composer pointer guard protects Send until click delivery", () => {
   assert.equal(pointerActive, true);
   assert.equal(shouldDeferMessagesRender({
     background: true,
-    composerPointerActive: pointerActive,
+    messagePointerActive: pointerActive,
   }), true, "refresh completion between pointerdown and click must defer rendering");
 
   releaseTarget.dispatchEvent(new Event("pointerup"));
@@ -446,6 +448,31 @@ test("composer pointer guard protects Send until click delivery", () => {
   releaseTarget.dispatchEvent(new Event("pointercancel"));
   scheduled.shift()();
   assert.equal(pointerActive, false, "release outside the composer cannot leave the guard active");
+});
+
+test("deferred refresh flushes only after message interaction ends", () => {
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    onMessagesTab: true,
+  }), true);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    onMessagesTab: true,
+    composerEngaged: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    onMessagesTab: true,
+    messagePointerActive: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    onMessagesTab: false,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: false,
+    onMessagesTab: true,
+  }), false);
 });
 
 test("message timelines force latest only for selections and sends", () => {

@@ -231,21 +231,21 @@ export const shouldDeferMessagesRender = ({
   background = false,
   composerFocusedAtStart = false,
   composerEngagedAtCompletion = false,
-  composerPointerActive = false,
+  messagePointerActive = false,
 } = {}) =>
   background && (
     composerFocusedAtStart ||
     composerEngagedAtCompletion ||
-    composerPointerActive
+    messagePointerActive
   );
 
-export const wireComposerInteractionGuard = (
-  composer,
+export const wireMessageInteractionGuard = (
+  target,
   onActiveChange,
   schedule = (callback) => window.setTimeout(callback, 0),
-  releaseTarget = composer.ownerDocument,
+  releaseTarget = target.ownerDocument,
 ) => {
-  composer.addEventListener("pointerdown", () => {
+  target.addEventListener("pointerdown", () => {
     onActiveChange(true);
     const release = () => {
       releaseTarget.removeEventListener("pointerup", release, true);
@@ -256,6 +256,14 @@ export const wireComposerInteractionGuard = (
     releaseTarget.addEventListener("pointercancel", release, true);
   });
 };
+
+export const shouldFlushDeferredMessagesRender = ({
+  deferred = false,
+  messagePointerActive = false,
+  onMessagesTab = false,
+  composerEngaged = false,
+} = {}) =>
+  deferred && onMessagesTab && !messagePointerActive && !composerEngaged;
 
 export const messageTimelineAtBottom = (
   { scrollHeight, clientHeight, scrollTop },

@@ -56,9 +56,10 @@ import {
   messageTimelineAtBottom,
   messageTimelineRestorePosition,
   shouldDeferMessagesRender,
+  shouldFlushDeferredMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
-  wireComposerInteractionGuard,
+  wireMessageInteractionGuard,
 } from "./message-view.js?v=20260902-0003";
 import {
   PANEL_TABS,
@@ -161,7 +162,8 @@ class MeshMonitorPanel extends HTMLElement {
       this._messageScrollRestoreGeneration = 0;
       this._forceMessageScrollToBottom = false;
       this._deferredMessagesRender = false;
-      this._composerPointerActive = false;
+      this._messagePointerActive = false;
+      this._messageFocusTarget = "";
       this._messageDrafts = new Map();
       this._composeSource = "";
       this._composeText = "";
@@ -298,7 +300,7 @@ class MeshMonitorPanel extends HTMLElement {
         composerFocusedAtStart,
         composerEngagedAtCompletion:
           this.shadowRoot?.activeElement?.closest?.(".compose") != null,
-        composerPointerActive: this._composerPointerActive,
+        messagePointerActive: this._messagePointerActive,
       })) this._deferredMessagesRender = true;
       else this._render();
     }
@@ -348,6 +350,10 @@ class MeshMonitorPanel extends HTMLElement {
         top: timeline.scrollTop,
       });
     }
+    const active = this.shadowRoot?.activeElement;
+    this._messageFocusTarget = active?.id === "scroll-to-latest"
+      ? "latest"
+      : active?.classList?.contains("messages") ? "timeline" : "";
     const rail = this.shadowRoot?.querySelector(".conversation-rail");
     if (rail)
       this._conversationRailScroll = {
@@ -374,6 +380,13 @@ class MeshMonitorPanel extends HTMLElement {
           : restorePosition;
         this._forceMessageScrollToBottom = false;
         this._updateScrollToLatest(timeline);
+        if (this._messageFocusTarget === "latest") {
+          const latest = this.shadowRoot?.querySelector("#scroll-to-latest");
+          (latest?.hidden ? timeline : latest)?.focus({preventScroll: true});
+        } else if (this._messageFocusTarget === "timeline") {
+          timeline.focus({preventScroll: true});
+        }
+        this._messageFocusTarget = "";
       }
       const rail = this.shadowRoot?.querySelector(".conversation-rail");
       if (rail && this._conversationRailScroll) {
@@ -874,7 +887,7 @@ class MeshMonitorPanel extends HTMLElement {
       ${this._notificationDialog()}`;
     this._restoreConversationView();
     this._wireMessageTimeline();
-    this._wireComposerInteractionGuard();
+    this._wireMessageInteractionGuards();
     this._restoreNotificationDeepLink();
     this.shadowRoot.querySelector("#sidebar-toggle")?.addEventListener("click", () =>
       this.dispatchEvent(new CustomEvent("hass-toggle-menu", {
@@ -2496,12 +2509,29 @@ class MeshMonitorPanel extends HTMLElement {
     wrapper.append(timeline, button);
   }
 
-  _wireComposerInteractionGuard() {
+  _flushDeferredMessagesRender() {
+    if (!shouldFlushDeferredMessagesRender({
+      deferred: this._deferredMessagesRender,
+      messagePointerActive: this._messagePointerActive,
+      onMessagesTab: this._tab === "messages",
+      composerEngaged:
+        this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+    })) return;
+    this._render();
+  }
+
+  _wireMessageInteractionGuards() {
     const composer = this.shadowRoot?.querySelector(".compose");
-    if (!composer) return;
-    wireComposerInteractionGuard(composer, (active) => {
-      this._composerPointerActive = active;
-    });
+    const timeline = this.shadowRoot?.querySelector(".timeline-wrapper");
+    for (const target of [composer, timeline].filter(Boolean))
+      wireMessageInteractionGuard(target, (active) => {
+        this._messagePointerActive = active;
+        if (!active) this._flushDeferredMessagesRender();
+      });
+    composer?.addEventListener("focusout", () => window.setTimeout(
+      () => this._flushDeferredMessagesRender(),
+      0,
+    ));
   }
 
   _restoreNotificationDeepLink() {
