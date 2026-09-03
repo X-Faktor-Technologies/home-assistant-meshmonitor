@@ -41,7 +41,7 @@ from .const import (
     SOURCE_TYPE_MESHTASTIC,
     SOURCE_TYPE_RETICULUM,
 )
-from .registry import server_fingerprint
+from .registry import async_get_devices, server_fingerprint
 from .vendor_meshmonitor_client import (
     MeshMonitorAuthenticationError,
     MeshMonitorClient,
@@ -730,8 +730,12 @@ def _migrate_registry_source_ids(hass: Any, entry_id: str, replacements: Mapping
             for item, new_unique_id in entity_updates
         )
         device_collision = any(
-            (collision := device_registry.async_get_device(identifiers=new_identifiers)) is not None
-            and collision.id != item.id
+            any(
+                collision.id != item.id
+                for collision in async_get_devices(
+                    device_registry, new_identifiers, entry_id
+                )
+            )
             for item, new_identifiers in device_updates
         )
         if entity_collision or device_collision:

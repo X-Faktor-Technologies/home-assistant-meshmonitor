@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import cast
+from typing import Any, cast
 
 from homeassistant.const import MAX_LENGTH_STATE_ENTITY_ID
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_registry import EntityRegistry
 from homeassistant.util import slugify
 
@@ -34,6 +35,58 @@ MEASUREMENT_OBJECT_IDS: dict[str, str] = {
 _DIGEST_LENGTHS = range(8, 65, 4)
 
 type EntityIdReservations = dict[tuple[str, str], str]
+
+
+def async_get_device_by_identifier(
+    registry: dr.DeviceRegistry,
+    identifier: tuple[str, str],
+    config_entry_id: str,
+) -> dr.DeviceEntry | None:
+    """Return one entry-owned device across supported HA registry generations."""
+    if lookup := getattr(registry, "async_get_device_by_identifier", None):
+        return cast(dr.DeviceEntry | None, lookup(identifier, config_entry_id))
+    return registry.async_get_device(identifiers={identifier})
+
+
+def async_get_devices(
+    registry: dr.DeviceRegistry,
+    identifiers: set[tuple[str, str]],
+    config_entry_id: str,
+) -> list[dr.DeviceEntry]:
+    """Return matching entry-owned devices across HA registry generations."""
+    if lookup := getattr(registry, "async_get_devices", None):
+        return cast(
+            list[dr.DeviceEntry],
+            lookup(identifiers=identifiers, config_entry_id=config_entry_id),
+        )
+    device = registry.async_get_device(identifiers=identifiers)
+    if device is None or not device_belongs_to_config_entry(device, config_entry_id):
+        return []
+    return [device]
+
+
+def device_belongs_to_config_entry(device: dr.DeviceEntry, config_entry_id: str) -> bool:
+    """Return whether a device has one exact config-entry owner."""
+    if (owner := getattr(device, "config_entry_id", None)) is not None:
+        return bool(owner == config_entry_id)
+    legacy_entries = cast(set[str], getattr(device, "config_entries", set()))
+    return legacy_entries == {config_entry_id}
+
+
+def node_parent_device_info(
+    registry: dr.DeviceRegistry,
+    identifier: tuple[str, str],
+    config_entry_id: str,
+) -> dict[str, Any]:
+    """Return the supported parent-device field for this HA registry generation."""
+    if hasattr(registry, "async_get_device_by_identifier"):
+        source_device = async_get_device_by_identifier(
+            registry, identifier, config_entry_id
+        )
+        if source_device is None:
+            raise RuntimeError(f"Source device is missing for {identifier[1]}")
+        return {"via_device_id": source_device.id}
+    return {"via_device": identifier}
 
 
 def server_fingerprint(normalized_url: str) -> str:

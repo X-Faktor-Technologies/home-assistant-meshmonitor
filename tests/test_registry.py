@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 from homeassistant.components.device_tracker import DOMAIN as TRACKER_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.core import HomeAssistant
@@ -10,9 +13,13 @@ from homeassistant.helpers import entity_registry as er
 from custom_components.meshmonitor.const import DOMAIN
 from custom_components.meshmonitor.registry import (
     MEASUREMENT_OBJECT_IDS,
+    async_get_device_by_identifier,
+    async_get_devices,
+    device_belongs_to_config_entry,
     node_device_identifier,
     node_entity_id_spec,
     node_entity_unique_id,
+    node_parent_device_info,
     plan_entity_ids,
     server_device_identifier,
     server_fingerprint,
@@ -23,6 +30,26 @@ from custom_components.meshmonitor.registry import (
 
 SERVER_A = server_fingerprint("https://mesh-a.test/base")
 SERVER_B = server_fingerprint("https://mesh-b.test/base")
+
+
+def test_modern_device_registry_helpers_are_config_entry_scoped() -> None:
+    """Supported HA registries use owned lookups and concrete parent IDs."""
+    identifier = (DOMAIN, "source:server:source-a")
+    device = SimpleNamespace(id="source-device", config_entry_id="entry")
+    registry = Mock()
+    registry.async_get_device_by_identifier.return_value = device
+    registry.async_get_devices.return_value = [device]
+
+    assert async_get_device_by_identifier(registry, identifier, "entry") is device
+    assert async_get_devices(registry, {identifier}, "entry") == [device]
+    assert device_belongs_to_config_entry(device, "entry") is True
+    assert node_parent_device_info(registry, identifier, "entry") == {
+        "via_device_id": "source-device"
+    }
+    registry.async_get_device_by_identifier.assert_called_with(identifier, "entry")
+    registry.async_get_devices.assert_called_once_with(
+        identifiers={identifier}, config_entry_id="entry"
+    )
 
 
 def _node_spec(

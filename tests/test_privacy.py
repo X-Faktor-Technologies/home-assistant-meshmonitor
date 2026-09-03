@@ -55,6 +55,21 @@ def test_current_device_tracker_api_and_sparse_sensor_registration() -> None:
     assert "description.value_fn(node) is None" in sensor
 
 
+def test_current_home_assistant_device_registry_apis() -> None:
+    """Prevent reintroducing APIs deprecated by Home Assistant 2026.9."""
+    source = "\n".join(
+        path.read_text()
+        for path in COMPONENT.rglob("*.py")
+        if path.name != "registry.py"
+    )
+    assert ".async_get_device(" not in source
+    assert ".devices.values()" not in source
+    assert "via_device=" not in source
+    compatibility = (COMPONENT / "registry.py").read_text()
+    assert 'getattr(registry, "async_get_device_by_identifier", None)' in compatibility
+    assert 'return {"via_device_id": source_device.id}' in compatibility
+
+
 def test_translations_are_valid_and_reauthentication_is_present() -> None:
     strings = json.loads((COMPONENT / "strings.json").read_text())
     english = json.loads((COMPONENT / "translations" / "en.json").read_text())

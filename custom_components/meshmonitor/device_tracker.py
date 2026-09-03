@@ -88,7 +88,7 @@ async def async_setup_entry(
                 )
                 entities.append(
                     MeshMonitorNodeTracker(
-                        coordinator, source, node, plans[unique_id]
+                        hass, coordinator, source, node, plans[unique_id]
                     )
                 )
             if entities:
@@ -125,12 +125,13 @@ class MeshMonitorNodeTracker(MeshMonitorNodeEntity, TrackerEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         coordinator: MeshMonitorCoordinator,
         source: MeshMonitorSourceRuntime,
         node: Node,
         entity_id: str,
     ) -> None:
-        super().__init__(coordinator, source, node, "location")
+        super().__init__(hass, coordinator, source, node, "location")
         self.entity_id = entity_id
         self._last_written_fingerprint = self._state_fingerprint()
 

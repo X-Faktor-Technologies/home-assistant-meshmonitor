@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Iterable
+from typing import cast
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,6 +20,7 @@ from .entity_policy import is_source_node, node_entities_enabled
 from .registry import (
     node_device_identifier,
     node_entity_unique_id,
+    node_parent_device_info,
     server_fingerprint,
     source_device_identifier,
 )
@@ -117,19 +120,32 @@ def source_device_info(source: MeshMonitorSourceRuntime) -> DeviceInfo:
     )
 
 
-def node_device_info(source: MeshMonitorSourceRuntime, node: Node) -> DeviceInfo:
+def node_device_info(
+    hass: HomeAssistant, source: MeshMonitorSourceRuntime, node: Node
+) -> DeviceInfo:
     """Build device registry information for a Meshtastic node."""
     if is_source_node(source, node):
         return source_device_info(source)
     fingerprint = server_fingerprint(source.data["url"])
     meshcore = source.source_type == SOURCE_TYPE_MESHCORE
-    return DeviceInfo(
-        identifiers={node_device_identifier(fingerprint, source.source_id, node.id)},
-        name=node.long_name or node.short_name or node.id,
-        manufacturer="MeshCore" if meshcore else "Meshtastic",
-        model=node.hardware_model or ("MeshCore contact" if meshcore else "Mesh node"),
-        sw_version=node.firmware_version,
-        via_device=source_device_identifier(fingerprint, source.source_id),
+    registry = dr.async_get(hass)
+    device_info: DeviceInfo = {
+        "identifiers": {node_device_identifier(fingerprint, source.source_id, node.id)},
+        "name": node.long_name or node.short_name or node.id,
+        "manufacturer": "MeshCore" if meshcore else "Meshtastic",
+        "model": node.hardware_model or ("MeshCore contact" if meshcore else "Mesh node"),
+        "sw_version": node.firmware_version,
+    }
+    return cast(
+        DeviceInfo,
+        {
+            **device_info,
+            **node_parent_device_info(
+                registry,
+                source_device_identifier(fingerprint, source.source_id),
+                source.entry.entry_id,
+            ),
+        },
     )
 
 
@@ -140,6 +156,7 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         coordinator: MeshMonitorCoordinator,
         source: MeshMonitorSourceRuntime,
         node: Node,
@@ -152,7 +169,7 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
         fingerprint = server_fingerprint(source.data["url"])
         self._removal_identity = (fingerprint, source.source_id, node.id)
         self._attr_unique_id = node_entity_unique_id(fingerprint, source.source_id, node.id, key)
-        self._attr_device_info = node_device_info(source, node)
+        self._attr_device_info = node_device_info(hass, source, node)
 
     @property
     def node(self) -> Node | None:
