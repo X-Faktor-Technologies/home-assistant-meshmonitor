@@ -227,6 +227,47 @@ export const sortMessagesChronologically = (messages) =>
     return time || String(left.id || "").localeCompare(String(right.id || ""));
   });
 
+export const shouldDeferMessagesRender = ({
+  background = false,
+  composerFocusedAtStart = false,
+  composerEngagedAtCompletion = false,
+  composerPointerActive = false,
+} = {}) =>
+  background && (
+    composerFocusedAtStart ||
+    composerEngagedAtCompletion ||
+    composerPointerActive
+  );
+
+export const wireComposerInteractionGuard = (
+  composer,
+  onActiveChange,
+  schedule = (callback) => window.setTimeout(callback, 0),
+  releaseTarget = composer.ownerDocument,
+) => {
+  composer.addEventListener("pointerdown", () => {
+    onActiveChange(true);
+    const release = () => {
+      releaseTarget.removeEventListener("pointerup", release, true);
+      releaseTarget.removeEventListener("pointercancel", release, true);
+      schedule(() => onActiveChange(false));
+    };
+    releaseTarget.addEventListener("pointerup", release, true);
+    releaseTarget.addEventListener("pointercancel", release, true);
+  });
+};
+
+export const messageTimelineAtBottom = (
+  { scrollHeight, clientHeight, scrollTop },
+  threshold = 48,
+) => scrollHeight - clientHeight - scrollTop < threshold;
+
+export const messageTimelineRestorePosition = ({
+  forceToBottom = false,
+  saved,
+} = {}) =>
+  forceToBottom || saved?.atBottom ? "bottom" : saved?.top ?? "bottom";
+
 const normalizedPeerId = (value) => String(value || "").toLowerCase();
 
 export const messageSenderName = (message, sources = []) => {

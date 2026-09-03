@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep the Messages composer stable during background refreshes, open selected
+  and sent conversations at the latest message, provide an accessible jump to
+  the latest message, and size message bubbles to their content.
 - Prevent duplicate Home Assistant device-tracker discovery when a node's
   coordinates temporarily disappear and later return.
 - Keep received and sent MeshCore direct messages in one conversation when

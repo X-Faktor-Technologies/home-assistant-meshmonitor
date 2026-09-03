@@ -13,9 +13,13 @@ import {
   messageSenderName,
   messageSendNonce,
   messageTimestampMs,
+  messageTimelineAtBottom,
+  messageTimelineRestorePosition,
   messagesInConversation,
+  shouldDeferMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
+  wireComposerInteractionGuard,
 } from "../../custom_components/meshmonitor/frontend/message-view.js";
 
 const SOURCE = {
@@ -343,6 +347,124 @@ test("outbound history never becomes unread", () => {
   assert.equal(presentation.unread, false);
 });
 
+test("timer refresh deferral protects composer engagement across an in-flight refresh", async () => {
+  let composerEngagedAtCompletion = false;
+  const refresh = Promise.resolve().then(() => {
+    composerEngagedAtCompletion = true;
+  });
+  const composerFocusedAtStart = false;
+  await refresh;
+
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: true,
+      composerFocusedAtStart,
+      composerEngagedAtCompletion,
+      composerPointerActive: false,
+    }),
+    true,
+    "focus acquired while a refresh is in flight must prevent destructive rendering",
+  );
+  assert.equal(shouldDeferMessagesRender({
+    background: true,
+    composerFocusedAtStart: true,
+    composerEngagedAtCompletion: false,
+  }), true, "focus present at refresh start remains protected after blur");
+  assert.equal(shouldDeferMessagesRender({
+    background: true,
+    composerPointerActive: true,
+  }), true, "pointerdown through click must not be interrupted by a refresh render");
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: true,
+      composerFocusedAtStart: false,
+      composerEngagedAtCompletion: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: false,
+      composerFocusedAtStart: true,
+      composerEngagedAtCompletion: true,
+    }),
+    false,
+  );
+
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /this\._load\(\{ background: true \}\)/);
+  const capture = panel.indexOf("const composerFocusedAtStart =");
+  const request = panel.indexOf("await this._hass.callWS({ type: \"meshmonitor/panel\" })");
+  const finallyPath = panel.indexOf("} finally {", request);
+  assert.ok(capture >= 0 && capture < request, "focus is captured before the request awaits");
+  assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
+  assert.match(panel, /this\.shadowRoot\?\.activeElement\?\.id === "compose-text"/);
+  assert.match(panel, /composerEngagedAtCompletion:\s+this\.shadowRoot\?\.activeElement\?\.closest\?\.\("\.compose"\) != null/);
+  assert.match(panel, /composerPointerActive: this\._composerPointerActive/);
+  assert.match(panel, /else if \(shouldDeferMessagesRender\(\{/);
+  const loadFinally = panel.slice(finallyPath, panel.indexOf("\n  _allNodes()", finallyPath));
+  assert.match(loadFinally, /activeElement/);
+  assert.match(panel, /_render\(\) \{\s+if \(!this\.shadowRoot\) return;\s+this\._deferredMessagesRender = false;/);
+  assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
+  assert.doesNotMatch(panel, /addEventListener\("blur"/);
+  assert.match(panel, /wireComposerInteractionGuard\(composer, \(active\) => \{/);
+});
+
+test("composer pointer guard protects Send until click delivery", () => {
+  const composer = new EventTarget();
+  const releaseTarget = new EventTarget();
+  const scheduled = [];
+  let pointerActive = false;
+  let clickDelivered = false;
+  wireComposerInteractionGuard(
+    composer,
+    (active) => { pointerActive = active; },
+    (callback) => scheduled.push(callback),
+    releaseTarget,
+  );
+  composer.addEventListener("click", () => { clickDelivered = true; });
+
+  composer.dispatchEvent(new Event("pointerdown"));
+  assert.equal(pointerActive, true);
+  assert.equal(shouldDeferMessagesRender({
+    background: true,
+    composerPointerActive: pointerActive,
+  }), true, "refresh completion between pointerdown and click must defer rendering");
+
+  releaseTarget.dispatchEvent(new Event("pointerup"));
+  assert.equal(pointerActive, true, "pointerup defers release until after click dispatch");
+  composer.dispatchEvent(new Event("click"));
+  assert.equal(clickDelivered, true);
+  scheduled.shift()();
+  assert.equal(pointerActive, false);
+
+  composer.dispatchEvent(new Event("pointerdown"));
+  assert.equal(pointerActive, true);
+  releaseTarget.dispatchEvent(new Event("pointercancel"));
+  scheduled.shift()();
+  assert.equal(pointerActive, false, "release outside the composer cannot leave the guard active");
+});
+
+test("message timelines force latest only for selections and sends", () => {
+  assert.equal(
+    messageTimelineRestorePosition({ forceToBottom: true, saved: { top: 120 } }),
+    "bottom",
+  );
+  assert.equal(
+    messageTimelineRestorePosition({ saved: { atBottom: true, top: 120 } }),
+    "bottom",
+  );
+  assert.equal(
+    messageTimelineRestorePosition({ saved: { atBottom: false, top: 120 } }),
+    120,
+  );
+  assert.equal(messageTimelineAtBottom({ scrollHeight: 1000, clientHeight: 400, scrollTop: 600 }), true);
+  assert.equal(messageTimelineAtBottom({ scrollHeight: 1000, clientHeight: 400, scrollTop: 500 }), false);
+});
+
 test("Messages includes persistent backend notification controls", () => {
   const panel = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
@@ -386,6 +508,20 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.match(panel, /scrollbar-gutter:stable/);
   assert.match(panel, /class="messages"[^>]+role="log"[^>]+tabindex="0"/);
   assert.match(panel, /_messageScrollByConversation/);
+  assert.match(panel, /_forceMessageScrollToBottom = true/);
+  assert.match(panel, /id = "scroll-to-latest"/);
+  assert.match(panel, /button\.textContent = "Scroll to latest"/);
+  assert.match(panel, /button\.type = "button"/);
+  assert.match(panel, /wrapper\.className = "timeline-wrapper"/);
+  assert.match(panel, /timeline\.replaceWith\(wrapper\);\s+wrapper\.append\(timeline, button\)/);
+  assert.match(panel, /timeline\.addEventListener\("scroll", \(\) => this\._updateScrollToLatest\(timeline\)\)/);
+  assert.match(panel, /timeline\.scrollTop = timeline\.scrollHeight/);
+  assert.match(panel, /timeline\.focus\(\{preventScroll: true\}\)/);
+  assert.match(panel, /\.timeline-wrapper \{ grid-row:2; position:relative; min-width:0; min-height:0; \}/);
+  assert.match(panel, /@media\(max-width:760px\)\{\.timeline-wrapper\{grid-row:1\}\}/);
+  assert.match(panel, /\.scroll-to-latest \{ position:absolute; right:20px; bottom:16px;/);
+  assert.doesNotMatch(panel, /bottom:116px/);
+  assert.match(panel, /\.scroll-to-latest:focus-visible \{ outline:3px solid var\(--primary-color\)/);
   assert.match(panel, /id="compose-send"/);
   assert.match(panel, /this\._sending \? "Sending…" : "Send"/);
   assert.match(panel, /data-reply-message/);
@@ -407,4 +543,17 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.doesNotMatch(panel, /window\.confirm/);
   assert.doesNotMatch(panel, /Review outbound message/);
   assert.doesNotMatch(panel, /\.message \{[^}]*border-left:4px/);
+});
+
+test("message bubbles are content-sized and safely wrap at every breakpoint", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /\.message \{ width:fit-content; max-width:min\(82%,760px\)/);
+  assert.match(panel, /\.message-text \{[^}]*overflow-wrap:anywhere/);
+  assert.match(panel, /@media\(max-width:760px\)[\s\S]*?\.message \{ width:fit-content; max-width:100%/);
+  assert.match(panel, /\.message\.incoming \{[^}]*border-bottom-left-radius:0/);
+  assert.match(panel, /\.message\.outgoing \{[^}]*border-bottom-right-radius:0/);
 });

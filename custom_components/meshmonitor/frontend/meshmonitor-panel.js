@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-2258";
+} from "./map-view.js?v=20260902-0003";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -53,9 +53,13 @@ import {
   messagePresentation,
   messageSendNonce,
   messageTimestampMs,
+  messageTimelineAtBottom,
+  messageTimelineRestorePosition,
+  shouldDeferMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
-} from "./message-view.js?v=20260823-1752";
+  wireComposerInteractionGuard,
+} from "./message-view.js?v=20260902-0003";
 import {
   PANEL_TABS,
   adjacentPanelTab,
@@ -155,6 +159,9 @@ class MeshMonitorPanel extends HTMLElement {
       this._messageScrollByConversation = new Map();
       this._conversationRailScroll = 0;
       this._messageScrollRestoreGeneration = 0;
+      this._forceMessageScrollToBottom = false;
+      this._deferredMessagesRender = false;
+      this._composerPointerActive = false;
       this._messageDrafts = new Map();
       this._composeSource = "";
       this._composeText = "";
@@ -245,7 +252,7 @@ class MeshMonitorPanel extends HTMLElement {
   _startTimers() {
     if (!this.isConnected) return;
     if (!this._timer)
-      this._timer = window.setInterval(() => this._load(), 30000);
+      this._timer = window.setInterval(() => this._load({ background: true }), 30000);
     if (!this._relativeTimeTimer)
       this._relativeTimeTimer = window.setInterval(() => {
         this._refreshNodeTimes();
@@ -267,8 +274,10 @@ class MeshMonitorPanel extends HTMLElement {
     this._destroyMap();
   }
 
-  async _load() {
+  async _load({ background = false } = {}) {
     if (!this._hass || this._loading) return;
+    const composerFocusedAtStart =
+      this.shadowRoot?.activeElement?.id === "compose-text";
     const refreshMapInPlace = this._tab === "map" && Boolean(this._mapInstance);
     this._loading = true;
     if (!this._data) this._render();
@@ -284,6 +293,13 @@ class MeshMonitorPanel extends HTMLElement {
     } finally {
       this._loading = false;
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
+      else if (shouldDeferMessagesRender({
+        background: background && this._tab === "messages",
+        composerFocusedAtStart,
+        composerEngagedAtCompletion:
+          this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+        composerPointerActive: this._composerPointerActive,
+      })) this._deferredMessagesRender = true;
       else this._render();
     }
   }
@@ -328,8 +344,7 @@ class MeshMonitorPanel extends HTMLElement {
       const key = timeline.dataset.conversation || "all";
       this._messageScrollByConversation.set(key, {
         atBottom:
-          timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop <
-          48,
+          messageTimelineAtBottom(timeline),
         top: timeline.scrollTop,
       });
     }
@@ -350,9 +365,15 @@ class MeshMonitorPanel extends HTMLElement {
         const saved = this._messageScrollByConversation.get(
           timeline.dataset.conversation || "all",
         );
-        timeline.scrollTop = saved?.atBottom
+        const restorePosition = messageTimelineRestorePosition({
+          forceToBottom: this._forceMessageScrollToBottom,
+          saved,
+        });
+        timeline.scrollTop = restorePosition === "bottom"
           ? timeline.scrollHeight
-          : saved?.top ?? timeline.scrollHeight;
+          : restorePosition;
+        this._forceMessageScrollToBottom = false;
+        this._updateScrollToLatest(timeline);
       }
       const rail = this.shadowRoot?.querySelector(".conversation-rail");
       if (rail && this._conversationRailScroll) {
@@ -364,6 +385,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    this._deferredMessagesRender = false;
     this._rememberConversationView();
     this._rememberMapView();
     this._destroyMap();
@@ -733,14 +755,15 @@ class MeshMonitorPanel extends HTMLElement {
         .notification-error { margin:0; padding:9px 11px; border-radius:8px; color:var(--error-color,#db4437); background:color-mix(in srgb,var(--error-color,#db4437) 10%,transparent); font-size:12px; }
         .notification-dialog-actions { display:flex; justify-content:flex-end; gap:9px; padding:11px 21px 17px; }
         .notification-dialog-actions .primary { color:var(--text-primary-color); background:var(--primary-color); }
-        .messages { min-width:0; min-height:0; overflow-y:scroll; overflow-x:hidden; display:flex; flex-direction:column; gap:10px; padding:18px clamp(16px,3vw,34px) 28px; scrollbar-color:color-mix(in srgb,var(--secondary-text-color) 78%,transparent) color-mix(in srgb,var(--secondary-background-color) 72%,transparent); scrollbar-width:auto; scrollbar-gutter:stable; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:auto; }
+        .timeline-wrapper { grid-row:2; position:relative; min-width:0; min-height:0; }
+        .messages { min-width:0; min-height:0; height:100%; overflow-y:scroll; overflow-x:hidden; display:flex; flex-direction:column; gap:10px; padding:18px clamp(16px,3vw,34px) 28px; scrollbar-color:color-mix(in srgb,var(--secondary-text-color) 78%,transparent) color-mix(in srgb,var(--secondary-background-color) 72%,transparent); scrollbar-width:auto; scrollbar-gutter:stable; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:auto; }
         .messages::-webkit-scrollbar,.conversation-rail::-webkit-scrollbar { width:12px; height:12px; }
         .messages::-webkit-scrollbar-track,.conversation-rail::-webkit-scrollbar-track { background:color-mix(in srgb,var(--secondary-background-color) 72%,transparent); }
         .messages::-webkit-scrollbar-thumb,.conversation-rail::-webkit-scrollbar-thumb { min-height:44px; border:3px solid transparent; border-radius:999px; background:color-mix(in srgb,var(--secondary-text-color) 78%,transparent); background-clip:padding-box; }
         .messages:focus-visible { outline:2px solid var(--primary-color); outline-offset:-4px; }
         .day-divider { width:min(100%,1040px); margin:9px auto 3px; display:flex; align-items:center; gap:12px; color:var(--secondary-text-color); font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
         .day-divider::before,.day-divider::after { content:""; height:1px; background:var(--divider-color); flex:1; }
-        .message { width:min(82%,760px); min-width:0; padding:11px 14px 10px; border:0; border-radius:11px; background:var(--secondary-background-color); box-shadow:none; }
+        .message { width:fit-content; max-width:min(82%,760px); min-width:0; padding:11px 14px 10px; border:0; border-radius:11px; background:var(--secondary-background-color); box-shadow:none; }
         .message.notification-target { outline:3px solid color-mix(in srgb,var(--primary-color) 65%,transparent); outline-offset:3px; }
         .message.incoming { align-self:flex-start; border-bottom-left-radius:0; }
         .message.outgoing { align-self:flex-end; border-bottom-right-radius:0; background:color-mix(in srgb,var(--primary-color) 18%,var(--card-background-color)); }
@@ -767,6 +790,8 @@ class MeshMonitorPanel extends HTMLElement {
         .message-reply { margin-left:auto; padding:3px 7px; border:0; border-radius:6px; background:transparent; color:var(--secondary-text-color); font-size:10px; }
         .message-reply:hover { color:var(--primary-text-color); background:color-mix(in srgb,var(--primary-color) 9%,transparent); }
         .messages .panel-state { min-height:100%; border:0; background:transparent; }
+        .scroll-to-latest { position:absolute; right:20px; bottom:16px; z-index:1; border-color:var(--primary-color); background:var(--card-background-color); box-shadow:0 3px 12px #0004; }
+        .scroll-to-latest:focus-visible { outline:3px solid var(--primary-color); outline-offset:3px; }
         .compose { min-width:0; margin:0; border-radius:0; border:0; border-top:1px solid var(--divider-color); padding:9px 13px 10px; background:transparent; box-shadow:none; }
         .compose-top { min-width:0; display:flex; align-items:center; gap:9px; margin-bottom:7px; }
         .compose-top label { min-width:0; display:flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:10px; }
@@ -822,7 +847,7 @@ class MeshMonitorPanel extends HTMLElement {
           .conversation-actions #mark-read { grid-column:span 2; }
           .conversation-alert { margin:9px 11px 0; }
           .messages { padding:12px 10px 20px 12px; scrollbar-gutter:stable; }
-          .message { width:100%; padding:12px 13px 11px; }
+          .message { width:fit-content; max-width:100%; padding:12px 13px 11px; }
           .message-text { max-width:none; }
           .message-head { align-items:baseline; flex-wrap:nowrap; }
           .reply-placeholder { align-items:flex-start; padding:11px 12px; }
@@ -833,6 +858,7 @@ class MeshMonitorPanel extends HTMLElement {
           .message-identity { align-items:flex-start; flex-direction:column; gap:3px; }
           .reply-state { display:none; }
         }
+        @media(max-width:760px){.timeline-wrapper{grid-row:1}}
         @media(max-width:760px){.conversation-shell{height:100%;min-height:0;max-height:none;display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto;padding:7px 10px max(7px,env(safe-area-inset-bottom))}.compose-top{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin-bottom:5px}.compose-top label{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:6px;width:100%}.compose-top select{width:100%;max-width:none;min-height:36px}.compose-route{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compose-body{grid-template-columns:1fr;gap:6px}.compose textarea{min-height:44px;max-height:96px;padding:7px 9px}.compose-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1fr);align-items:center;justify-items:stretch}.compose-action #compose-send{width:100%;min-height:44px}.compose-count{text-align:left}.compose-note{display:none}.send-review-grid{grid-template-columns:1fr}}
         @media(prefers-reduced-motion:reduce){.leaflet-fade-anim .leaflet-popup,.leaflet-zoom-anim .leaflet-zoom-animated{transition:none!important}}
       </style>
@@ -847,6 +873,8 @@ class MeshMonitorPanel extends HTMLElement {
       ${this._advertDialog()}
       ${this._notificationDialog()}`;
     this._restoreConversationView();
+    this._wireMessageTimeline();
+    this._wireComposerInteractionGuard();
     this._restoreNotificationDeepLink();
     this.shadowRoot.querySelector("#sidebar-toggle")?.addEventListener("click", () =>
       this.dispatchEvent(new CustomEvent("hass-toggle-menu", {
@@ -2435,9 +2463,45 @@ class MeshMonitorPanel extends HTMLElement {
     this._composeSource = "";
     this._sendStatus = "";
     this._sendReview = null;
+    this._forceMessageScrollToBottom = true;
     if (!keepReplyContext) this._replyContext = null;
     localStorage.setItem("meshmonitor.messages.conversation", key);
     this._render();
+  }
+
+  _updateScrollToLatest(timeline) {
+    const button = this.shadowRoot?.querySelector("#scroll-to-latest");
+    if (!button || !timeline) return;
+    button.hidden = messageTimelineAtBottom(timeline);
+  }
+
+  _wireMessageTimeline() {
+    const timeline = this.shadowRoot?.querySelector(".messages");
+    if (!timeline) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "timeline-wrapper";
+    const button = document.createElement("button");
+    button.id = "scroll-to-latest";
+    button.className = "scroll-to-latest";
+    button.type = "button";
+    button.textContent = "Scroll to latest";
+    button.hidden = true;
+    button.addEventListener("click", () => {
+      timeline.scrollTop = timeline.scrollHeight;
+      this._updateScrollToLatest(timeline);
+      timeline.focus({preventScroll: true});
+    });
+    timeline.addEventListener("scroll", () => this._updateScrollToLatest(timeline));
+    timeline.replaceWith(wrapper);
+    wrapper.append(timeline, button);
+  }
+
+  _wireComposerInteractionGuard() {
+    const composer = this.shadowRoot?.querySelector(".compose");
+    if (!composer) return;
+    wireComposerInteractionGuard(composer, (active) => {
+      this._composerPointerActive = active;
+    });
   }
 
   _restoreNotificationDeepLink() {
@@ -2859,6 +2923,7 @@ class MeshMonitorPanel extends HTMLElement {
     };
     this._pendingMessages.push(pending);
     this._sending = true;
+    this._forceMessageScrollToBottom = true;
     this._composeText = "";
     this._messageDrafts.delete(this._conversation);
     this._replyContext = null;
@@ -2915,7 +2980,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-2258")) {
-  customElements.define("meshmonitor-panel-20260829-2258", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260902-0003")) {
+  customElements.define("meshmonitor-panel-20260902-0003", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
