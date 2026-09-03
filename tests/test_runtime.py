@@ -33,6 +33,10 @@ from custom_components.meshmonitor.const import (
     NODE_DEVICE_POLICY_FAVORITES,
 )
 from custom_components.meshmonitor.coordinator import MeshMonitorCoordinator
+from custom_components.meshmonitor.device_tracker import MeshMonitorNodeTracker
+from custom_components.meshmonitor.device_tracker import (
+    async_setup_entry as async_setup_trackers,
+)
 from custom_components.meshmonitor.entity import async_add_node_entities
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
@@ -475,6 +479,139 @@ async def test_sensor_discovery_readds_node_after_favorite_policy_removal(
     listener()
     assert len(added) == initial_count + 1
     assert sum(getattr(entity, "node_id", None) == favorite.id for entity in added) == 2
+
+
+async def test_tracker_discovery_keeps_existing_tracker_during_coordinate_loss(
+    hass: HomeAssistant,
+) -> None:
+    """A coordinate gap does not rediscover an active node tracker."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_ALL},
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    positioned = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+        }
+    )
+    unpositioned = Node.from_dict(
+        {"id": positioned.id, "longName": "Mobile node"}
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={unpositioned.id: unpositioned},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added: list[object] = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_trackers(hass, entry, add_entities)  # type: ignore[arg-type]
+    listener = coordinator.async_add_listener.call_args.args[0]
+    assert added == []
+
+    coordinator.nodes = {positioned.id: positioned}
+    listener()
+    assert len(added) == 1
+
+    coordinator.nodes = {unpositioned.id: unpositioned}
+    listener()
+    coordinator.nodes = {positioned.id: positioned}
+    listener()
+
+    assert len(added) == 1
+
+
+async def test_tracker_rediscovery_waits_for_authoritative_removal(
+    hass: HomeAssistant,
+) -> None:
+    """A retired tracker exits before the same tracker identity is rediscovered."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {
+                CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_FAVORITES
+            },
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    favorite = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+            "isFavorite": True,
+        }
+    )
+    ineligible = Node.from_dict(
+        {
+            "id": favorite.id,
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+            "isFavorite": False,
+        }
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={favorite.id: favorite},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added: list[MeshMonitorNodeTracker] = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_trackers(hass, entry, add_entities)  # type: ignore[arg-type]
+    tracker = added[0]
+    tracker.hass = hass
+    listener = coordinator.async_add_listener.call_args.args[0]
+    removal_gate = asyncio.Event()
+
+    async def remove_tracker(**_: object) -> None:
+        await removal_gate.wait()
+
+    coordinator.nodes = {ineligible.id: ineligible}
+    with patch.object(tracker, "async_remove", AsyncMock(side_effect=remove_tracker)):
+        tracker._handle_coordinator_update()
+        assert tracker.async_remove.await_count == 1
+
+        listener()
+        coordinator.nodes = {favorite.id: favorite}
+        listener()
+        assert len(added) == 1
+
+        removal_gate.set()
+        await hass.async_block_till_done()
+
+    assert len(added) == 2
+    assert added[1].unique_id == tracker.unique_id
 
 
 async def test_shared_message_runtime_uses_server_interval_and_enabled_sources(

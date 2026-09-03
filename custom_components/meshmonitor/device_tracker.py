@@ -55,8 +55,6 @@ async def async_setup_entry(
                 node.id
                 for node in coordinator.nodes.values()
                 if node_entities_enabled(source, node)
-                and node.latitude is not None
-                and node.longitude is not None
             }
             known.intersection_update(eligible)
             specs = [
@@ -139,6 +137,12 @@ class MeshMonitorNodeTracker(MeshMonitorNodeEntity, TrackerEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Avoid recorder writes when a polled position is unchanged."""
+        node = self.node
+        if self.coordinator.last_update_success and (
+            node is None or not node_entities_enabled(self.source, node)
+        ):
+            super()._handle_coordinator_update()
+            return
         fingerprint = self._state_fingerprint()
         if fingerprint == self._last_written_fingerprint:
             return
