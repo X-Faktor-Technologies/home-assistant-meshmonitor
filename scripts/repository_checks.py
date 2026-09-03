@@ -488,7 +488,10 @@ def _public_addresses(
             }
         except OSError as err:
             return [], f"DNS lookup failed: {err}"
-    if any(not address.is_global or address.is_site_local for address in addresses):
+    if any(
+        not address.is_global or getattr(address, "is_site_local", False)
+        for address in addresses
+    ):
         return [], "host resolves to a non-public address"
     return sorted(addresses, key=str), None
 
