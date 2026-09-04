@@ -52,6 +52,29 @@ def test_modern_device_registry_helpers_are_config_entry_scoped() -> None:
     )
 
 
+def test_legacy_device_lookup_rejects_foreign_or_shared_ownership() -> None:
+    """Legacy fallback never returns a device not owned by this entry alone."""
+    identifier = (DOMAIN, "source:server:source-a")
+    owned = SimpleNamespace(id="owned", config_entries={"entry"})
+    foreign = SimpleNamespace(id="foreign", config_entries={"other-entry"})
+    shared = SimpleNamespace(id="shared", config_entries={"entry", "other-entry"})
+    registry = SimpleNamespace(async_get_device=Mock())
+
+    for candidate, expected in ((owned, owned), (foreign, None), (shared, None)):
+        registry.async_get_device.return_value = candidate
+        assert async_get_device_by_identifier(registry, identifier, "entry") is expected
+
+
+def test_missing_modern_parent_omits_relationship_without_exposing_identity() -> None:
+    """A missing parent does not abort node entity construction."""
+    identifier = (DOMAIN, "source:server:private-source")
+    registry = Mock()
+    registry.async_get_device_by_identifier.return_value = None
+
+    assert node_parent_device_info(registry, identifier, "entry") == {}
+    registry.async_get_device_by_identifier.assert_called_once_with(identifier, "entry")
+
+
 def _node_spec(
     *,
     server: str = SERVER_A,

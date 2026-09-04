@@ -45,7 +45,10 @@ def async_get_device_by_identifier(
     """Return one entry-owned device across supported HA registry generations."""
     if lookup := getattr(registry, "async_get_device_by_identifier", None):
         return cast(dr.DeviceEntry | None, lookup(identifier, config_entry_id))
-    return registry.async_get_device(identifiers={identifier})
+    device = registry.async_get_device(identifiers={identifier})
+    if device is None or not device_belongs_to_config_entry(device, config_entry_id):
+        return None
+    return device
 
 
 def async_get_devices(
@@ -84,7 +87,7 @@ def node_parent_device_info(
             registry, identifier, config_entry_id
         )
         if source_device is None:
-            raise RuntimeError(f"Source device is missing for {identifier[1]}")
+            return {}
         return {"via_device_id": source_device.id}
     return {"via_device": identifier}
 
