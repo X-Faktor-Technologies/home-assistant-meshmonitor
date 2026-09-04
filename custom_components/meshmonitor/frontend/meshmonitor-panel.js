@@ -782,7 +782,7 @@ class MeshMonitorPanel extends HTMLElement {
         .message.pending { opacity:.82; }
         .message-send-state { margin-left:auto; display:inline-flex; align-items:center; gap:5px; }
         .message-send-state.sending::before { content:""; width:10px; height:10px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:message-spin .75s linear infinite; }
-        .message-send-state.accepted::before { content:"✓"; font-size:13px; }
+        .message-send-state.accepted::before { content:"◷"; font-size:13px; }
         .message-send-state.failed { color:var(--error-color,#db4437); }
         .message-send-state.failed::before { content:"!"; font-weight:800; }
         @keyframes message-spin { to { transform:rotate(360deg); } }
@@ -2517,14 +2517,12 @@ class MeshMonitorPanel extends HTMLElement {
   }
 
   _wireMessageInteractionGuards() {
-    const composer = this.shadowRoot?.querySelector(".compose");
-    const timeline = this.shadowRoot?.querySelector(".timeline-wrapper");
     const shell = this.shadowRoot?.querySelector(".conversation-shell");
-    for (const target of [composer, timeline].filter(Boolean))
-      wireMessageInteractionGuard(target, (active) => {
-        this._messagePointerActive = active;
-        if (!active) this._flushDeferredMessagesRender();
-      });
+    if (!shell) return;
+    wireMessageInteractionGuard(shell, (active) => {
+      this._messagePointerActive = active;
+      if (!active) this._flushDeferredMessagesRender();
+    });
     shell?.addEventListener("focusout", () => window.setTimeout(
       () => this._flushDeferredMessagesRender(),
       0,

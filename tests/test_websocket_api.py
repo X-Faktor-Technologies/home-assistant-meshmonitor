@@ -848,6 +848,98 @@ async def test_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
 
 
 @pytest.mark.asyncio
+async def test_meshtastic_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = SimpleNamespace(
+        send_meshtastic_message=AsyncMock(
+            return_value=SimpleNamespace(
+                success=False,
+                message_id=None,
+                delivery_state=None,
+            )
+        )
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-meshtastic",
+        data={CONF_SOURCE_TYPE: "meshtastic"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 92,
+        "entry_id": "entry-meshtastic",
+        "source_id": "source-meshtastic",
+        "protocol": "meshtastic",
+        "text": "Hello",
+        "nonce": "4123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "channel": 0,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    client.send_meshtastic_message.assert_awaited_once_with(
+        "source-meshtastic", "Hello", channel=0, to_node_id=None
+    )
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        92, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reticulum_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = MeshMonitorClient("http://mesh.invalid", "token")
+    entry = SimpleNamespace(
+        entry_id="entry-rns",
+        data={CONF_SOURCE_TYPE: "reticulum"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 93,
+        "entry_id": "entry-rns",
+        "source_id": "source-rns",
+        "protocol": "reticulum",
+        "text": "Hello over LXMF",
+        "nonce": "5123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "a" * 32,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+        patch.object(
+            client,
+            "_post_json",
+            AsyncMock(return_value={"success": False, "data": {"id": "rejected"}}),
+        ),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        93, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
 async def test_panel_send_validates_before_reserving_transmit_guard() -> None:
     client = SimpleNamespace(send_meshcore_message=AsyncMock())
     entry = SimpleNamespace(
@@ -885,6 +977,88 @@ async def test_panel_send_validates_before_reserving_transmit_guard() -> None:
     client.send_meshcore_message.assert_not_awaited()
     connection.send_error.assert_called_once_with(
         91, "invalid_format", "Message or destination failed validation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_meshtastic_panel_send_validates_before_reserving_guard() -> None:
+    client = SimpleNamespace(send_meshtastic_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-meshtastic",
+        data={CONF_SOURCE_TYPE: "meshtastic"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 94,
+        "entry_id": "entry-meshtastic",
+        "source_id": "source-meshtastic",
+        "protocol": "meshtastic",
+        "text": "Hello",
+        "nonce": "6123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "bad-node",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_meshtastic_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        94, "invalid_format", "Message or destination failed validation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reticulum_panel_send_validates_before_reserving_guard() -> None:
+    client = SimpleNamespace(send_reticulum_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-rns",
+        data={CONF_SOURCE_TYPE: "reticulum"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 95,
+        "entry_id": "entry-rns",
+        "source_id": "source-rns",
+        "protocol": "reticulum",
+        "text": "Hello over LXMF",
+        "nonce": "7123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "not-a-destination-hash",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_reticulum_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        95, "invalid_format", "Message or destination failed validation"
     )
 
 

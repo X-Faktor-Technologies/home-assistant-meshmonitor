@@ -199,14 +199,10 @@ export const pendingMessagePresentation = (pending) => {
     return { label: "Sending", title: "Submitting once to MeshMonitor" };
   if (pending.state === "accepted") {
     const deliveryState = String(pending.deliveryState || "accepted").toLowerCase();
-    const label = deliveryState === "sent"
-      ? "Sent"
-      : deliveryState === "queued"
-        ? "Queued by MeshMonitor"
-        : "Accepted by MeshMonitor";
     return {
-      label,
-      title: `${label}; radio delivery is not confirmed`,
+      label: "Accepted by MeshMonitor",
+      title:
+        `MeshMonitor reported ${deliveryState}; stored history and radio delivery are not confirmed`,
     };
   }
   return {

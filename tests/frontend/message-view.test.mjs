@@ -303,13 +303,16 @@ test("radio-backed sends await MeshMonitor and preserve its acceptance state", (
   assert.doesNotMatch(panel, /Queued once by Home Assistant/);
   assert.deepEqual(
     pendingMessagePresentation({ state: "accepted", deliveryState: "sent" }),
-    { label: "Sent", title: "Sent; radio delivery is not confirmed" },
+    {
+      label: "Accepted by MeshMonitor",
+      title: "MeshMonitor reported sent; stored history and radio delivery are not confirmed",
+    },
   );
   assert.deepEqual(
     pendingMessagePresentation({ state: "accepted", deliveryState: "queued" }),
     {
-      label: "Queued by MeshMonitor",
-      title: "Queued by MeshMonitor; radio delivery is not confirmed",
+      label: "Accepted by MeshMonitor",
+      title: "MeshMonitor reported queued; stored history and radio delivery are not confirmed",
     },
   );
 });
@@ -520,21 +523,21 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
   }
 });
 
-test("message pointer guard protects activation until click delivery", () => {
-  const composer = new EventTarget();
+test("whole-workspace pointer guard protects controls until click delivery", () => {
+  const messageWorkspace = new EventTarget();
   const releaseTarget = new EventTarget();
   const scheduled = [];
   let pointerActive = false;
   let clickDelivered = false;
   wireMessageInteractionGuard(
-    composer,
+    messageWorkspace,
     (active) => { pointerActive = active; },
     (callback) => scheduled.push(callback),
     releaseTarget,
   );
-  composer.addEventListener("click", () => { clickDelivered = true; });
+  messageWorkspace.addEventListener("click", () => { clickDelivered = true; });
 
-  composer.dispatchEvent(new Event("pointerdown"));
+  messageWorkspace.dispatchEvent(new Event("pointerdown"));
   assert.equal(pointerActive, true);
   assert.equal(shouldDeferMessagesRender({
     background: true,
@@ -543,16 +546,23 @@ test("message pointer guard protects activation until click delivery", () => {
 
   releaseTarget.dispatchEvent(new Event("pointerup"));
   assert.equal(pointerActive, true, "pointerup defers release until after click dispatch");
-  composer.dispatchEvent(new Event("click"));
+  messageWorkspace.dispatchEvent(new Event("click"));
   assert.equal(clickDelivered, true);
   scheduled.shift()();
   assert.equal(pointerActive, false);
 
-  composer.dispatchEvent(new Event("pointerdown"));
+  messageWorkspace.dispatchEvent(new Event("pointerdown"));
   assert.equal(pointerActive, true);
   releaseTarget.dispatchEvent(new Event("pointercancel"));
   scheduled.shift()();
-  assert.equal(pointerActive, false, "release outside the composer cannot leave the guard active");
+  assert.equal(pointerActive, false, "release outside Messages cannot leave the guard active");
+
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /wireMessageInteractionGuard\(shell,/);
+  assert.doesNotMatch(panel, /\[composer, timeline\]/);
 });
 
 test("deferred refresh flushes only after message interaction ends", () => {
