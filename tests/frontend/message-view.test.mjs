@@ -413,9 +413,10 @@ test("timer refresh deferral protects live composer engagement", async () => {
   assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
   assert.match(panel, /activeElement: this\.shadowRoot\?\.activeElement/);
   assert.match(panel, /messagePointerActive: this\._messagePointerActive/);
-  assert.match(panel, /else completeMessagesRefresh\(\{/);
+  assert.match(panel, /_completeBackgroundRender\(\)/);
   const loadFinally = panel.slice(finallyPath, panel.indexOf("\n  _allNodes()", finallyPath));
-  assert.match(loadFinally, /activeElement/);
+  assert.match(loadFinally, /_completeBackgroundRender/);
+  assert.match(panel, /if \(this\._tab === "overview"\) this\._completeBackgroundRender\(\)/);
   assert.match(panel, /_render\(\) \{\s+if \(!this\.shadowRoot\) return;\s+this\._deferredMessagesRender = false;/);
   assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
   assert.doesNotMatch(panel, /addEventListener\("blur"/);
@@ -533,7 +534,7 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
   }
 });
 
-test("notification edits survive rerender until Save or Cancel", () => {
+test("notification edits survive refresh and commit only on Save", async () => {
   const panelSource = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
     "utf8",
@@ -560,13 +561,35 @@ test("notification edits survive rerender until Save or Cancel", () => {
   };
   panel._notificationSaving = false;
   panel._notificationError = "";
-  panel._render = () => {};
+  let renderCount = 0;
+  panel._render = () => { renderCount += 1; };
+  const refreshedSettings = {
+    enabled: false,
+    target: "notify.old",
+    scope: "channel",
+    include_preview: false,
+    targets: panel._notificationSettings.targets,
+  };
+  const savedSettings = {
+    enabled: true,
+    target: "notify.new",
+    scope: "direct",
+    include_preview: true,
+    targets: panel._notificationSettings.targets,
+  };
+  panel._hass = {
+    callWS: async (request) => request.type === "meshmonitor/notification_settings"
+      ? refreshedSettings
+      : savedSettings,
+  };
 
   panel._openNotificationDialog();
   panel._notificationDraft.enabled = true;
   panel._notificationDraft.target = "notify.new";
   panel._notificationDraft.scope = "direct";
   panel._notificationDraft.include_preview = true;
+
+  await panel._loadNotificationSettings();
 
   const rerendered = panel._notificationDialog();
   assert.match(rerendered, /id="notification-enabled" type="checkbox" checked/);
@@ -575,6 +598,18 @@ test("notification edits survive rerender until Save or Cancel", () => {
   assert.match(rerendered, /id="notification-preview" type="checkbox" checked/);
   assert.equal(panel._notificationSettings.enabled, false);
   assert.equal(panel._notificationSettings.target, "notify.old");
+
+  await panel._saveNotificationSettings();
+  assert.deepEqual(panel._notificationSettings, savedSettings);
+  assert.equal(panel._notificationDialogOpen, false);
+  assert.equal(panel._notificationDraft, null);
+  assert.equal(renderCount, 3);
+
+  panel._openNotificationDialog();
+  panel._notificationDraft.enabled = false;
+  panel._closeNotificationDialog();
+  assert.equal(panel._notificationDraft, null);
+  assert.equal(panel._notificationSettings.enabled, true);
 });
 
 test("whole-workspace pointer guard protects controls until click delivery", () => {

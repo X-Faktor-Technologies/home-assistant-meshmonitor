@@ -261,7 +261,7 @@ class MeshMonitorPanel extends HTMLElement {
     if (!this._relativeTimeTimer)
       this._relativeTimeTimer = window.setInterval(() => {
         this._refreshNodeTimes();
-        if (this._tab === "overview") this._render();
+        if (this._tab === "overview") this._completeBackgroundRender();
       }, 15000);
   }
 
@@ -296,14 +296,19 @@ class MeshMonitorPanel extends HTMLElement {
     } finally {
       this._loading = false;
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
-      else completeMessagesRefresh({
-        background,
-        activeElement: this.shadowRoot?.activeElement,
-        messagePointerActive: this._messagePointerActive,
-        onDefer: () => { this._deferredMessagesRender = true; },
-        onRender: () => this._render(),
-      });
+      else if (background) this._completeBackgroundRender();
+      else this._render();
     }
+  }
+
+  _completeBackgroundRender() {
+    completeMessagesRefresh({
+      background: true,
+      activeElement: this.shadowRoot?.activeElement,
+      messagePointerActive: this._messagePointerActive,
+      onDefer: () => { this._deferredMessagesRender = true; },
+      onRender: () => this._render(),
+    });
   }
 
   _allNodes() {
@@ -1132,14 +1137,10 @@ class MeshMonitorPanel extends HTMLElement {
       () => this._openNotificationDialog(),
     );
     this.shadowRoot.querySelector("#close-notification-dialog")?.addEventListener("click", () => {
-      this._notificationDialogOpen = false;
-      this._notificationDraft = null;
-      this._render();
+      this._closeNotificationDialog();
     });
     this.shadowRoot.querySelector("#cancel-notification-settings")?.addEventListener("click", () => {
-      this._notificationDialogOpen = false;
-      this._notificationDraft = null;
-      this._render();
+      this._closeNotificationDialog();
     });
     for (const [id, field, kind] of [
       ["notification-enabled", "enabled", "checked"],
@@ -2633,6 +2634,12 @@ class MeshMonitorPanel extends HTMLElement {
         targets: [],
       }),
     };
+    this._render();
+  }
+
+  _closeNotificationDialog() {
+    this._notificationDialogOpen = false;
+    this._notificationDraft = null;
     this._render();
   }
 
