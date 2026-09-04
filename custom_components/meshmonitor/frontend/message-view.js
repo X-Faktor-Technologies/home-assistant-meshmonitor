@@ -251,10 +251,12 @@ export const sortMessagesChronologically = (messages) =>
 export const shouldDeferMessagesRender = ({
   background = false,
   composerEngagedAtCompletion = false,
+  messagesEngagedAtCompletion = false,
   messagePointerActive = false,
 } = {}) =>
   background && (
     composerEngagedAtCompletion ||
+    messagesEngagedAtCompletion ||
     messagePointerActive
   );
 
@@ -267,7 +269,8 @@ export const completeMessagesRefresh = ({
 } = {}) => {
   const deferred = shouldDeferMessagesRender({
     background,
-    composerEngagedAtCompletion: activeElement?.closest?.(".compose") != null,
+    messagesEngagedAtCompletion:
+      activeElement?.closest?.(".conversation-shell") != null,
     messagePointerActive,
   });
   if (deferred) onDefer?.();
@@ -298,8 +301,13 @@ export const shouldFlushDeferredMessagesRender = ({
   messagePointerActive = false,
   onMessagesTab = false,
   composerEngaged = false,
+  messagesEngaged = false,
 } = {}) =>
-  deferred && onMessagesTab && !messagePointerActive && !composerEngaged;
+  deferred &&
+  onMessagesTab &&
+  !messagePointerActive &&
+  !composerEngaged &&
+  !messagesEngaged;
 
 export const messageTimelineAtBottom = (
   { scrollHeight, clientHeight, scrollTop },

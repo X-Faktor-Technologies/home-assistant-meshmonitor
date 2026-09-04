@@ -56,7 +56,7 @@ node --test tests/frontend/*.test.mjs
 git diff --check
 ```
 
-Pytest should report 203 passing tests and the Node runner should report 97
+Pytest should report 204 passing tests and the Node runner should report 98
 passing frontend tests in the current tree. The Python suite blocks
 unexpected socket use, and all MeshMonitor client interactions are mocked, so
 these commands must not contact a live mesh service. Run a focused test during

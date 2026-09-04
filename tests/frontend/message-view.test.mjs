@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import vm from "node:vm";
 
 import {
   completeMessagesRefresh,
@@ -416,7 +417,7 @@ test("timer refresh deferral protects live composer engagement", async () => {
   assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
   assert.doesNotMatch(panel, /addEventListener\("blur"/);
   assert.match(panel, /_flushDeferredMessagesRender\(\)/);
-  assert.match(panel, /composer\?\.addEventListener\("focusout"/);
+  assert.match(panel, /shell\?\.addEventListener\("focusout"/);
 });
 
 test("background refresh preserves an engaged composer's focus and caret", () => {
@@ -425,7 +426,9 @@ test("background refresh preserves an engaged composer's focus and caret", () =>
     selectionStart: 14,
     selectionEnd: 14,
     closest(selector) {
-      return selector === ".compose" ? { className: "compose" } : null;
+      return selector === ".compose" || selector === ".conversation-shell"
+        ? { className: selector.slice(1) }
+        : null;
     },
   };
   let deferred = false;
@@ -449,6 +452,72 @@ test("background refresh preserves an engaged composer's focus and caret", () =>
   assert.equal(textarea.value, "A deliberately unfinished draft");
   assert.equal(textarea.selectionStart, 14);
   assert.equal(textarea.selectionEnd, 14);
+});
+
+test("the panel load lifecycle preserves focused Messages controls", async () => {
+  const panelSource = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  )
+    .replace(/^import[\s\S]*?;\n/gm, "")
+    .replace(/if \(!customElements\.get[\s\S]*$/m, "")
+    .replace(
+      "class MeshMonitorPanel extends HTMLElement",
+      "globalThis.MeshMonitorPanel = class MeshMonitorPanel extends HTMLElement",
+    );
+  const context = {
+    HTMLElement: class {},
+    completeMessagesRefresh,
+  };
+  vm.runInNewContext(panelSource, context);
+
+  for (const control of [
+    {
+      id: "compose-text",
+      value: "A draft that must survive",
+      selectionStart: 11,
+      selectionEnd: 11,
+      closest: (selector) => selector === ".conversation-shell" || selector === ".compose"
+        ? { className: selector.slice(1) }
+        : null,
+    },
+    {
+      id: "message-search",
+      value: "remote node",
+      selectionStart: 6,
+      selectionEnd: 6,
+      closest: (selector) => selector === ".conversation-shell"
+        ? { className: "conversation-shell" }
+        : null,
+    },
+  ]) {
+    const panel = Object.create(context.MeshMonitorPanel.prototype);
+    panel._data = { sources: [] };
+    panel._notificationSettings = {};
+    panel._tab = "messages";
+    panel._loading = false;
+    panel._mapInstance = null;
+    panel._messagePointerActive = false;
+    panel._deferredMessagesRender = false;
+    panel.shadowRoot = { activeElement: control };
+    panel._applyFavoriteOverrides = () => {};
+    panel._hass = { callWS: async () => ({ sources: [] }) };
+    let renderCount = 0;
+    panel._render = () => {
+      renderCount += 1;
+      control.value = "";
+      control.selectionStart = 0;
+      control.selectionEnd = 0;
+    };
+
+    await panel._load({ background: true });
+
+    assert.equal(panel._deferredMessagesRender, true);
+    assert.equal(renderCount, 0);
+    assert.notEqual(control.value, "");
+    assert.notEqual(control.selectionStart, 0);
+    assert.equal(panel.shadowRoot.activeElement, control);
+  }
 });
 
 test("message pointer guard protects activation until click delivery", () => {
@@ -495,6 +564,11 @@ test("deferred refresh flushes only after message interaction ends", () => {
     deferred: true,
     onMessagesTab: true,
     composerEngaged: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    onMessagesTab: true,
+    messagesEngaged: true,
   }), false);
   assert.equal(shouldFlushDeferredMessagesRender({
     deferred: true,

@@ -44,6 +44,7 @@ from custom_components.meshmonitor.vendor_meshmonitor_client import (
     VersionCheck,
 )
 from custom_components.meshmonitor.vendor_meshmonitor_client.client import (
+    MeshMonitorClient,
     _validate_message_text,
 )
 from custom_components.meshmonitor.vendor_meshmonitor_client.exceptions import (
@@ -740,6 +741,25 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
         88,
         {"accepted": True, "message_id": "lxmf-message", "delivery_state": "sending"},
     )
+
+
+@pytest.mark.asyncio
+async def test_reticulum_client_rejects_unsuccessful_2xx_receipt() -> None:
+    client = MeshMonitorClient("http://mesh.invalid", "token")
+    with patch.object(
+        client,
+        "_post_json",
+        AsyncMock(return_value={"success": False, "data": {"id": "rejected"}}),
+    ):
+        with pytest.raises(
+            MeshMonitorResponseError,
+            match="did not accept the Reticulum message",
+        ):
+            await client.send_reticulum_message(
+                "source-rns",
+                "Hello over LXMF",
+                to_destination_hash="a" * 32,
+            )
 
 
 @pytest.mark.asyncio

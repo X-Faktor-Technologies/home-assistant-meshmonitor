@@ -2510,6 +2510,8 @@ class MeshMonitorPanel extends HTMLElement {
       onMessagesTab: this._tab === "messages",
       composerEngaged:
         this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+      messagesEngaged:
+        this.shadowRoot?.activeElement?.closest?.(".conversation-shell") != null,
     })) return;
     this._render();
   }
@@ -2517,12 +2519,13 @@ class MeshMonitorPanel extends HTMLElement {
   _wireMessageInteractionGuards() {
     const composer = this.shadowRoot?.querySelector(".compose");
     const timeline = this.shadowRoot?.querySelector(".timeline-wrapper");
+    const shell = this.shadowRoot?.querySelector(".conversation-shell");
     for (const target of [composer, timeline].filter(Boolean))
       wireMessageInteractionGuard(target, (active) => {
         this._messagePointerActive = active;
         if (!active) this._flushDeferredMessagesRender();
       });
-    composer?.addEventListener("focusout", () => window.setTimeout(
+    shell?.addEventListener("focusout", () => window.setTimeout(
       () => this._flushDeferredMessagesRender(),
       0,
     ));
