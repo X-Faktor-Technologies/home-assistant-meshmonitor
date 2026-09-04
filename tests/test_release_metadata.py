@@ -41,8 +41,14 @@ def test_release_metadata_and_workflow_stay_aligned() -> None:
     assert "environment: release" in release_workflow
     assert "overwrite_files: false" in release_workflow
     assert "draft: true" in release_workflow
-    assert "actions/upload-artifact@" in release_workflow
-    assert "actions/download-artifact@" in release_workflow
+    assert (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+        in release_workflow
+    )
+    assert (
+        "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+        in release_workflow
+    )
     assert "RELEASE_TAG: ${{ inputs.tag }}" in release_workflow
     assert 'metadata --tag "${RELEASE_TAG}"' in release_workflow
     assert "group: release" in release_workflow
