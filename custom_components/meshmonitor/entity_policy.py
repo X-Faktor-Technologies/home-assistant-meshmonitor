@@ -16,7 +16,7 @@ from .const import (
     NODE_DEVICE_POLICY_ALL,
     NODE_DEVICE_POLICY_FAVORITES,
 )
-from .registry import node_device_identifier
+from .registry import node_device_identifier, source_device_identifier
 from .vendor_meshmonitor_client import Node
 
 if TYPE_CHECKING:
@@ -106,14 +106,22 @@ def registry_reconciliation_plan(
             if device is not None and device.config_entries == {entry.entry_id}:
                 device_ids.add(device.id)
 
-        node_prefix = f"node:{fingerprint}:{source.source_id}:"
+        source_device = device_registry.async_get_device(
+            identifiers={source_device_identifier(fingerprint, source.source_id)}
+        )
+        if source_device is None:
+            continue
         for device in device_registry.devices.values():
-            if device.config_entries != {entry.entry_id}:
+            if (
+                device.config_entries != {entry.entry_id}
+                or device.via_device_id != source_device.id
+            ):
                 continue
             scoped_identifiers = {
                 (domain, identifier)
                 for domain, identifier in device.identifiers
-                if domain == "meshmonitor" and identifier.startswith(node_prefix)
+                if domain == "meshmonitor"
+                and identifier.startswith(f"node:{fingerprint}:")
             }
             if scoped_identifiers and scoped_identifiers.isdisjoint(active_identifiers):
                 device_ids.add(device.id)

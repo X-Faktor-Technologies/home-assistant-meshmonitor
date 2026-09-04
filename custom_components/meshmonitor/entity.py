@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -30,9 +30,14 @@ def async_add_node_entities(
     hass: HomeAssistant,
     async_add_entities: AddEntitiesCallback,
     entities: Iterable[Entity],
+    is_current: Callable[[Entity], bool] | None = None,
 ) -> None:
     """Add entities only after matching in-flight removals have completed."""
     batch = tuple(entities)
+
+    def current_batch() -> tuple[Entity, ...]:
+        return batch if is_current is None else tuple(filter(is_current, batch))
+
     removals: dict[str, asyncio.Task[None]] = hass.data.setdefault(DOMAIN, {}).setdefault(
         _NODE_ENTITY_REMOVALS, {}
     )
@@ -43,12 +48,14 @@ def async_add_node_entities(
         and (task := removals.get(entity.unique_id)) is not None
     )
     if not pending:
-        async_add_entities(batch)
+        if current := current_batch():
+            async_add_entities(current)
         return
 
     async def add_after_removals() -> None:
         await asyncio.gather(*pending)
-        async_add_entities(batch)
+        if current := current_batch():
+            async_add_entities(current)
 
     hass.async_create_task(
         add_after_removals(),

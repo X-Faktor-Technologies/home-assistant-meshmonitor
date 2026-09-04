@@ -22,7 +22,10 @@ from custom_components.meshmonitor.entity_policy import (
     node_entities_enabled,
     registry_reconciliation_plan,
 )
-from custom_components.meshmonitor.registry import node_device_identifier
+from custom_components.meshmonitor.registry import (
+    node_device_identifier,
+    source_device_identifier,
+)
 from custom_components.meshmonitor.vendor_meshmonitor_client import Node
 
 
@@ -89,7 +92,7 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
         "ordinary": _node("ordinary"),
     }
     other_source = _source(NODE_DEVICE_POLICY_FAVORITES)
-    other_source.source_id = "source-b"
+    other_source.source_id = "source-a:child"
     other_source.coordinator.nodes = {
         "new-identity": _node("new-identity", favorite=True)
     }
@@ -108,11 +111,20 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
     other_source.entry = entry
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
+    devices.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={source_device_identifier(fingerprint, source.source_id)},
+    )
+    devices.async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={source_device_identifier(fingerprint, other_source.source_id)},
+    )
     created = {}
     for node_id in (*source.coordinator.nodes, "deleted"):
         device = devices.async_get_or_create(
             config_entry_id=entry_id,
             identifiers={node_device_identifier(fingerprint, source.source_id, node_id)},
+            via_device=source_device_identifier(fingerprint, source.source_id),
         )
         created[node_id] = device.id
         entities.async_get_or_create(
@@ -130,7 +142,10 @@ async def test_reconciliation_removes_only_ineligible_node_registry_objects(
     )
     other_source_device = devices.async_get_or_create(
         config_entry_id=entry_id,
-        identifiers={node_device_identifier(fingerprint, "source-b", "new-identity")},
+        identifiers={
+            node_device_identifier(fingerprint, other_source.source_id, "new-identity")
+        },
+        via_device=source_device_identifier(fingerprint, other_source.source_id),
         name="xMesh-01",
     )
 

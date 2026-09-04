@@ -16,6 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -192,7 +193,6 @@ async def async_setup_entry(
                 for node in coordinator.nodes.values()
                 if node_entities_enabled(source, node)
                 for description in NODE_SENSORS
-                if description.value_fn(node) is not None
             }
             known.intersection_update(eligible)
             for node in coordinator.nodes.values():
@@ -212,7 +212,19 @@ async def async_setup_entry(
                         )
                     )
             if entities:
-                async_add_node_entities(hass, async_add_entities, entities)
+                def is_current(entity: Entity) -> bool:
+                    if not isinstance(entity, MeshMonitorNodeSensor):
+                        return False
+                    node = entity.node
+                    return bool(
+                        node is not None
+                        and node_entities_enabled(source, node)
+                        and entity.entity_description.value_fn(node) is not None
+                    )
+
+                async_add_node_entities(
+                    hass, async_add_entities, entities, is_current=is_current
+                )
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))

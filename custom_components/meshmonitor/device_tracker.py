@@ -6,6 +6,7 @@ from homeassistant.components.device_tracker import TrackerEntity  # type: ignor
 from homeassistant.components.device_tracker.const import SourceType
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (
@@ -91,7 +92,20 @@ async def async_setup_entry(
                     )
                 )
             if entities:
-                async_add_node_entities(hass, async_add_entities, entities)
+                def is_current(entity: Entity) -> bool:
+                    if not isinstance(entity, MeshMonitorNodeTracker):
+                        return False
+                    node = entity.node
+                    return bool(
+                        node is not None
+                        and node_entities_enabled(source, node)
+                        and node.latitude is not None
+                        and node.longitude is not None
+                    )
+
+                async_add_node_entities(
+                    hass, async_add_entities, entities, is_current=is_current
+                )
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))
