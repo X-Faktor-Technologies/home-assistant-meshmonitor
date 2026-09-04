@@ -82,12 +82,10 @@ def node_parent_device_info(
     config_entry_id: str,
 ) -> dict[str, Any]:
     """Return the supported parent-device field for this HA registry generation."""
+    source_device = async_get_device_by_identifier(registry, identifier, config_entry_id)
+    if source_device is None:
+        return {}
     if hasattr(registry, "async_get_device_by_identifier"):
-        source_device = async_get_device_by_identifier(
-            registry, identifier, config_entry_id
-        )
-        if source_device is None:
-            return {}
         return {"via_device_id": source_device.id}
     return {"via_device": identifier}
 

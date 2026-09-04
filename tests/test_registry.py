@@ -8,9 +8,13 @@ from unittest.mock import Mock
 from homeassistant.components.device_tracker import DOMAIN as TRACKER_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meshmonitor.const import DOMAIN
+from custom_components.meshmonitor.entity import node_device_info
+from custom_components.meshmonitor.entity_policy import registry_reconciliation_plan
 from custom_components.meshmonitor.registry import (
     MEASUREMENT_OBJECT_IDS,
     async_get_device_by_identifier,
@@ -27,6 +31,7 @@ from custom_components.meshmonitor.registry import (
     source_entity_id_spec,
     source_entity_unique_id,
 )
+from custom_components.meshmonitor.vendor_meshmonitor_client import Node
 
 SERVER_A = server_fingerprint("https://mesh-a.test/base")
 SERVER_B = server_fingerprint("https://mesh-b.test/base")
@@ -63,16 +68,50 @@ def test_legacy_device_lookup_rejects_foreign_or_shared_ownership() -> None:
     for candidate, expected in ((owned, owned), (foreign, None), (shared, None)):
         registry.async_get_device.return_value = candidate
         assert async_get_device_by_identifier(registry, identifier, "entry") is expected
+        expected_parent = {"via_device": identifier} if expected is owned else {}
+        assert node_parent_device_info(registry, identifier, "entry") == expected_parent
 
 
-def test_missing_modern_parent_omits_relationship_without_exposing_identity() -> None:
-    """A missing parent does not abort node entity construction."""
-    identifier = (DOMAIN, "source:server:private-source")
-    registry = Mock()
-    registry.async_get_device_by_identifier.return_value = None
+def test_missing_modern_parent_is_recreated_and_remains_reconcilable(
+    hass: HomeAssistant,
+) -> None:
+    """A missing source parent is repaired before its child is registered."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="entry", data={})
+    entry.add_to_hass(hass)
+    source = SimpleNamespace(
+        source_id="source-a",
+        source_type="meshcore",
+        title="Synthetic source",
+        data={"url": "https://mesh.example"},
+        entry=entry,
+        coordinator=SimpleNamespace(
+            data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+            nodes={},
+            last_update_success=True,
+        ),
+    )
+    node = Node.from_dict({"id": "remote", "longName": "Synthetic remote"})
+    fingerprint = server_fingerprint(source.data["url"])
+    registry = dr.async_get(hass)
 
-    assert node_parent_device_info(registry, identifier, "entry") == {}
-    registry.async_get_device_by_identifier.assert_called_once_with(identifier, "entry")
+    child_info = node_device_info(hass, source, node)
+    parent = async_get_device_by_identifier(
+        registry,
+        source_device_identifier(fingerprint, source.source_id),
+        entry.entry_id,
+    )
+    assert parent is not None
+    child = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        **child_info,
+    )
+    assert child.via_device_id == parent.id
+
+    entry.runtime_data = SimpleNamespace(
+        fingerprint=fingerprint,
+        sources={source.source_id: source},
+    )
+    assert child.id in registry_reconciliation_plan(hass, entry).device_ids
 
 
 def _node_spec(

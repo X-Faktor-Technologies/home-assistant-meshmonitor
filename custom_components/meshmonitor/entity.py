@@ -129,6 +129,18 @@ def node_device_info(
     fingerprint = server_fingerprint(source.data["url"])
     meshcore = source.source_type == SOURCE_TYPE_MESHCORE
     registry = dr.async_get(hass)
+    parent_identifier = source_device_identifier(fingerprint, source.source_id)
+    parent_info = node_parent_device_info(
+        registry, parent_identifier, source.entry.entry_id
+    )
+    if not parent_info and hasattr(registry, "async_get_device_by_identifier"):
+        registry.async_get_or_create(
+            config_entry_id=source.entry.entry_id,
+            **source_device_info(source),
+        )
+        parent_info = node_parent_device_info(
+            registry, parent_identifier, source.entry.entry_id
+        )
     device_info: DeviceInfo = {
         "identifiers": {node_device_identifier(fingerprint, source.source_id, node.id)},
         "name": node.long_name or node.short_name or node.id,
@@ -140,11 +152,7 @@ def node_device_info(
         DeviceInfo,
         {
             **device_info,
-            **node_parent_device_info(
-                registry,
-                source_device_identifier(fingerprint, source.source_id),
-                source.entry.entry_id,
-            ),
+            **parent_info,
         },
     )
 
