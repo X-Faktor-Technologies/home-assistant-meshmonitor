@@ -266,7 +266,9 @@ export const completeMessagesRefresh = ({
   const deferred = shouldDeferMessagesRender({
     background,
     messagesEngagedAtCompletion:
-      activeElement?.closest?.(".conversation-shell") != null,
+      activeElement?.closest?.(
+        "#panel-view, #notification-bell, .notification-dialog",
+      ) != null,
     messagePointerActive,
   });
   if (deferred) onDefer?.();

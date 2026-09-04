@@ -2508,25 +2508,31 @@ class MeshMonitorPanel extends HTMLElement {
       deferred: this._deferredMessagesRender,
       messagePointerActive: this._messagePointerActive,
       onMessagesTab: this._tab === "messages",
-      composerEngaged:
-        this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+      composerEngaged: this.shadowRoot?.activeElement?.closest?.(".compose") != null,
       messagesEngaged:
-        this.shadowRoot?.activeElement?.closest?.(".conversation-shell") != null,
+        this.shadowRoot?.activeElement?.closest?.(
+          "#panel-view, #notification-bell, .notification-dialog",
+        ) != null,
     })) return;
     this._render();
   }
 
   _wireMessageInteractionGuards() {
-    const shell = this.shadowRoot?.querySelector(".conversation-shell");
-    if (!shell) return;
-    wireMessageInteractionGuard(shell, (active) => {
-      this._messagePointerActive = active;
-      if (!active) this._flushDeferredMessagesRender();
-    });
-    shell?.addEventListener("focusout", () => window.setTimeout(
-      () => this._flushDeferredMessagesRender(),
-      0,
-    ));
+    const targets = [
+      this.shadowRoot?.querySelector("#panel-view"),
+      this.shadowRoot?.querySelector("#notification-bell"),
+      this.shadowRoot?.querySelector(".notification-dialog"),
+    ].filter(Boolean);
+    for (const target of targets) {
+      wireMessageInteractionGuard(target, (active) => {
+        this._messagePointerActive = active;
+        if (!active) this._flushDeferredMessagesRender();
+      });
+      target.addEventListener("focusout", () => window.setTimeout(
+        () => this._flushDeferredMessagesRender(),
+        0,
+      ));
+    }
   }
 
   _restoreNotificationDeepLink() {

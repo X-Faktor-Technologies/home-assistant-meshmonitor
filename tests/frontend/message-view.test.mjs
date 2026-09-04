@@ -420,7 +420,7 @@ test("timer refresh deferral protects live composer engagement", async () => {
   assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
   assert.doesNotMatch(panel, /addEventListener\("blur"/);
   assert.match(panel, /_flushDeferredMessagesRender\(\)/);
-  assert.match(panel, /shell\?\.addEventListener\("focusout"/);
+  assert.match(panel, /target\.addEventListener\("focusout"/);
 });
 
 test("background refresh preserves an engaged composer's focus and caret", () => {
@@ -429,8 +429,8 @@ test("background refresh preserves an engaged composer's focus and caret", () =>
     selectionStart: 14,
     selectionEnd: 14,
     closest(selector) {
-      return selector === ".compose" || selector === ".conversation-shell"
-        ? { className: selector.slice(1) }
+      return selector === ".compose" || selector.includes("#panel-view")
+        ? { className: "compose" }
         : null;
     },
   };
@@ -480,8 +480,8 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
       value: "A draft that must survive",
       selectionStart: 11,
       selectionEnd: 11,
-      closest: (selector) => selector === ".conversation-shell" || selector === ".compose"
-        ? { className: selector.slice(1) }
+      closest: (selector) => selector === ".compose" || selector.includes("#panel-view")
+        ? { className: "compose" }
         : null,
     },
     {
@@ -489,8 +489,17 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
       value: "remote node",
       selectionStart: 6,
       selectionEnd: 6,
-      closest: (selector) => selector === ".conversation-shell"
+      closest: (selector) => selector.includes("#panel-view")
         ? { className: "conversation-shell" }
+        : null,
+    },
+    {
+      id: "notification-target",
+      value: "notify.mobile_app",
+      selectionStart: 5,
+      selectionEnd: 5,
+      closest: (selector) => selector.includes(".notification-dialog")
+        ? { className: "notification-dialog" }
         : null,
     },
   ]) {
@@ -561,8 +570,10 @@ test("whole-workspace pointer guard protects controls until click delivery", () 
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
     "utf8",
   );
-  assert.match(panel, /wireMessageInteractionGuard\(shell,/);
-  assert.doesNotMatch(panel, /\[composer, timeline\]/);
+  assert.match(panel, /querySelector\("#panel-view"\)/);
+  assert.match(panel, /querySelector\("#notification-bell"\)/);
+  assert.match(panel, /querySelector\("\.notification-dialog"\)/);
+  assert.match(panel, /wireMessageInteractionGuard\(target,/);
 });
 
 test("deferred refresh flushes only after message interaction ends", () => {
