@@ -1138,11 +1138,6 @@ async def websocket_send_message(
         )
         return
 
-    message_runtime = (
-        hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
-    )
-    if message_runtime:
-        await message_runtime["coordinator"].async_request_refresh()
     connection.send_result(
         msg["id"],
         {
@@ -1151,6 +1146,14 @@ async def websocket_send_message(
             "delivery_state": delivery_state or "accepted",
         },
     )
+    message_runtime = (
+        hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
+    )
+    if message_runtime:
+        hass.async_create_task(
+            message_runtime["coordinator"].async_request_refresh(),
+            f"{DOMAIN} refresh messages after accepted send",
+        )
 
 
 @websocket_command(

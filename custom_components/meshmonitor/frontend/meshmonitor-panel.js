@@ -175,6 +175,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._pendingMessages = [];
       this._notificationSettings = null;
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
       this._notificationSaving = false;
       this._notificationError = "";
       this._advertReview = null;
@@ -296,7 +297,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._loading = false;
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
       else completeMessagesRefresh({
-        background: background && this._tab === "messages",
+        background,
         activeElement: this.shadowRoot?.activeElement,
         messagePointerActive: this._messagePointerActive,
         onDefer: () => { this._deferredMessagesRender = true; },
@@ -1126,21 +1127,31 @@ class MeshMonitorPanel extends HTMLElement {
     this.shadowRoot.querySelector("#conversation-mute")?.addEventListener("click", () =>
       this._toggleConversationPreference("muted", this._conversation),
     );
-    this.shadowRoot.querySelector("#notification-bell")?.addEventListener("click", async () => {
-      this._notificationDialogOpen = true;
-      this._notificationError = "";
-      this._render();
-      await this._loadNotificationSettings();
-      this._render();
-    });
+    this.shadowRoot.querySelector("#notification-bell")?.addEventListener(
+      "click",
+      () => this._openNotificationDialog(),
+    );
     this.shadowRoot.querySelector("#close-notification-dialog")?.addEventListener("click", () => {
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
       this._render();
     });
     this.shadowRoot.querySelector("#cancel-notification-settings")?.addEventListener("click", () => {
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
       this._render();
     });
+    for (const [id, field, kind] of [
+      ["notification-enabled", "enabled", "checked"],
+      ["notification-target", "target", "value"],
+      ["notification-scope", "scope", "value"],
+      ["notification-preview", "include_preview", "checked"],
+    ]) {
+      this.shadowRoot.querySelector(`#${id}`)?.addEventListener("change", (event) => {
+        if (this._notificationDraft)
+          this._notificationDraft[field] = event.target[kind];
+      });
+    }
     this.shadowRoot.querySelector("#save-notification-settings")?.addEventListener("click", () =>
       this._saveNotificationSettings(),
     );
@@ -2507,11 +2518,10 @@ class MeshMonitorPanel extends HTMLElement {
     if (!shouldFlushDeferredMessagesRender({
       deferred: this._deferredMessagesRender,
       messagePointerActive: this._messagePointerActive,
-      onMessagesTab: this._tab === "messages",
       composerEngaged: this.shadowRoot?.activeElement?.closest?.(".compose") != null,
       messagesEngaged:
         this.shadowRoot?.activeElement?.closest?.(
-          "#panel-view, #notification-bell, .notification-dialog",
+          ".messages-view, #notification-bell, .notification-dialog",
         ) != null,
     })) return;
     this._render();
@@ -2519,7 +2529,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _wireMessageInteractionGuards() {
     const targets = [
-      this.shadowRoot?.querySelector("#panel-view"),
+      this.shadowRoot?.querySelector(".messages-view"),
       this.shadowRoot?.querySelector("#notification-bell"),
       this.shadowRoot?.querySelector(".notification-dialog"),
     ].filter(Boolean);
@@ -2611,11 +2621,27 @@ class MeshMonitorPanel extends HTMLElement {
     }
   }
 
+  _openNotificationDialog() {
+    this._notificationDialogOpen = true;
+    this._notificationError = "";
+    this._notificationDraft = {
+      ...(this._notificationSettings || {
+        enabled: false,
+        target: "",
+        scope: "all",
+        include_preview: false,
+        targets: [],
+      }),
+    };
+    this._render();
+  }
+
   async _saveNotificationSettings() {
-    const enabled = Boolean(this.shadowRoot.querySelector("#notification-enabled")?.checked);
-    const target = this.shadowRoot.querySelector("#notification-target")?.value || "";
-    const scope = this.shadowRoot.querySelector("#notification-scope")?.value || "all";
-    const includePreview = Boolean(this.shadowRoot.querySelector("#notification-preview")?.checked);
+    const draft = this._notificationDraft || {};
+    const enabled = Boolean(draft.enabled);
+    const target = String(draft.target || "");
+    const scope = String(draft.scope || "all");
+    const includePreview = Boolean(draft.include_preview);
     if (enabled && !target) {
       this._notificationError = "Choose a Home Assistant notification target before enabling alerts.";
       this._render();
@@ -2633,6 +2659,7 @@ class MeshMonitorPanel extends HTMLElement {
         include_preview: includePreview,
       });
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
     } catch (error) {
       this._notificationError = error?.message || "Notification settings could not be saved.";
     } finally {
@@ -2654,7 +2681,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _notificationDialog() {
     if (!this._notificationDialogOpen) return "";
-    const settings = this._notificationSettings || {
+    const settings = this._notificationDraft || this._notificationSettings || {
       enabled: false, target: "", scope: "all", include_preview: false, targets: [],
     };
     const targets = Array.isArray(settings.targets) ? settings.targets : [];

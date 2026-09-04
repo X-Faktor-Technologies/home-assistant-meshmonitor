@@ -429,7 +429,7 @@ test("background refresh preserves an engaged composer's focus and caret", () =>
     selectionStart: 14,
     selectionEnd: 14,
     closest(selector) {
-      return selector === ".compose" || selector.includes("#panel-view")
+      return selector === ".compose" || selector.includes(".messages-view")
         ? { className: "compose" }
         : null;
     },
@@ -480,7 +480,7 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
       value: "A draft that must survive",
       selectionStart: 11,
       selectionEnd: 11,
-      closest: (selector) => selector === ".compose" || selector.includes("#panel-view")
+      closest: (selector) => selector === ".compose" || selector.includes(".messages-view")
         ? { className: "compose" }
         : null,
     },
@@ -489,12 +489,13 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
       value: "remote node",
       selectionStart: 6,
       selectionEnd: 6,
-      closest: (selector) => selector.includes("#panel-view")
+      closest: (selector) => selector.includes(".messages-view")
         ? { className: "conversation-shell" }
         : null,
     },
     {
       id: "notification-target",
+      tab: "overview",
       value: "notify.mobile_app",
       selectionStart: 5,
       selectionEnd: 5,
@@ -506,7 +507,7 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
     const panel = Object.create(context.MeshMonitorPanel.prototype);
     panel._data = { sources: [] };
     panel._notificationSettings = {};
-    panel._tab = "messages";
+    panel._tab = control.tab || "messages";
     panel._loading = false;
     panel._mapInstance = null;
     panel._messagePointerActive = false;
@@ -530,6 +531,50 @@ test("the panel load lifecycle preserves focused Messages controls", async () =>
     assert.notEqual(control.selectionStart, 0);
     assert.equal(panel.shadowRoot.activeElement, control);
   }
+});
+
+test("notification edits survive rerender until Save or Cancel", () => {
+  const panelSource = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  )
+    .replace(/^import[\s\S]*?;\n/gm, "")
+    .replace(/if \(!customElements\.get[\s\S]*$/m, "")
+    .replace(
+      "class MeshMonitorPanel extends HTMLElement",
+      "globalThis.MeshMonitorPanel = class MeshMonitorPanel extends HTMLElement",
+    );
+  const context = { HTMLElement: class {} };
+  vm.runInNewContext(panelSource, context);
+
+  const panel = Object.create(context.MeshMonitorPanel.prototype);
+  panel._notificationSettings = {
+    enabled: false,
+    target: "notify.old",
+    scope: "all",
+    include_preview: false,
+    targets: [
+      { id: "notify.old", label: "Old", entity_id: "notify.old" },
+      { id: "notify.new", label: "New", entity_id: "notify.new" },
+    ],
+  };
+  panel._notificationSaving = false;
+  panel._notificationError = "";
+  panel._render = () => {};
+
+  panel._openNotificationDialog();
+  panel._notificationDraft.enabled = true;
+  panel._notificationDraft.target = "notify.new";
+  panel._notificationDraft.scope = "direct";
+  panel._notificationDraft.include_preview = true;
+
+  const rerendered = panel._notificationDialog();
+  assert.match(rerendered, /id="notification-enabled" type="checkbox" checked/);
+  assert.match(rerendered, /value="notify.new" selected/);
+  assert.match(rerendered, /value="direct" selected/);
+  assert.match(rerendered, /id="notification-preview" type="checkbox" checked/);
+  assert.equal(panel._notificationSettings.enabled, false);
+  assert.equal(panel._notificationSettings.target, "notify.old");
 });
 
 test("whole-workspace pointer guard protects controls until click delivery", () => {
@@ -570,7 +615,7 @@ test("whole-workspace pointer guard protects controls until click delivery", () 
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
     "utf8",
   );
-  assert.match(panel, /querySelector\("#panel-view"\)/);
+  assert.match(panel, /querySelector\("\.messages-view"\)/);
   assert.match(panel, /querySelector\("#notification-bell"\)/);
   assert.match(panel, /querySelector\("\.notification-dialog"\)/);
   assert.match(panel, /wireMessageInteractionGuard\(target,/);
@@ -579,30 +624,21 @@ test("whole-workspace pointer guard protects controls until click delivery", () 
 test("deferred refresh flushes only after message interaction ends", () => {
   assert.equal(shouldFlushDeferredMessagesRender({
     deferred: true,
-    onMessagesTab: true,
   }), true);
   assert.equal(shouldFlushDeferredMessagesRender({
     deferred: true,
-    onMessagesTab: true,
     composerEngaged: true,
   }), false);
   assert.equal(shouldFlushDeferredMessagesRender({
     deferred: true,
-    onMessagesTab: true,
     messagesEngaged: true,
   }), false);
   assert.equal(shouldFlushDeferredMessagesRender({
     deferred: true,
-    onMessagesTab: true,
     messagePointerActive: true,
   }), false);
   assert.equal(shouldFlushDeferredMessagesRender({
-    deferred: true,
-    onMessagesTab: false,
-  }), false);
-  assert.equal(shouldFlushDeferredMessagesRender({
     deferred: false,
-    onMessagesTab: true,
   }), false);
 });
 

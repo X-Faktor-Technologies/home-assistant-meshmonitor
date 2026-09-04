@@ -267,7 +267,7 @@ export const completeMessagesRefresh = ({
     background,
     messagesEngagedAtCompletion:
       activeElement?.closest?.(
-        "#panel-view, #notification-bell, .notification-dialog",
+        ".messages-view, #notification-bell, .notification-dialog",
       ) != null,
     messagePointerActive,
   });
@@ -297,12 +297,10 @@ export const wireMessageInteractionGuard = (
 export const shouldFlushDeferredMessagesRender = ({
   deferred = false,
   messagePointerActive = false,
-  onMessagesTab = false,
   composerEngaged = false,
   messagesEngaged = false,
 } = {}) =>
   deferred &&
-  onMessagesTab &&
   !messagePointerActive &&
   !composerEngaged &&
   !messagesEngaged;

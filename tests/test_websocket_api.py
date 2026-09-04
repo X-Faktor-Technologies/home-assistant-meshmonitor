@@ -21,6 +21,7 @@ from custom_components.meshmonitor.const import (
     CONF_SERVER_OPTIONS,
     CONF_SOURCE_OPTIONS,
     CONF_SOURCE_TYPE,
+    DOMAIN,
     NODE_DEVICE_POLICY_FAVORITES,
 )
 from custom_components.meshmonitor.server_health_coordinator import (
@@ -711,9 +712,22 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
         runtime_data=SimpleNamespace(client=client),
     )
     hass = Mock()
-    hass.data = {}
-    hass.async_create_task = Mock()
     connection = Mock()
+    coordinator = SimpleNamespace(async_request_refresh=AsyncMock())
+    hass.data = {
+        DOMAIN: {
+            "message_coordinators": {
+                "entry-rns": {"coordinator": coordinator},
+            }
+        }
+    }
+    scheduled = []
+
+    def schedule_after_result(coro: object, _name: str) -> None:
+        assert connection.send_result.called
+        scheduled.append(coro)
+
+    hass.async_create_task = Mock(side_effect=schedule_after_result)
     message = {
         "id": 88,
         "entry_id": "entry-rns",
@@ -741,6 +755,9 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
         88,
         {"accepted": True, "message_id": "lxmf-message", "delivery_state": "sending"},
     )
+    hass.async_create_task.assert_called_once()
+    assert len(scheduled) == 1
+    scheduled[0].close()
 
 
 @pytest.mark.asyncio
