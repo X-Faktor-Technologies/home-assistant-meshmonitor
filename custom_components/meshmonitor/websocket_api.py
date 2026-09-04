@@ -1214,7 +1214,9 @@ async def websocket_set_favorite(
             fingerprint = entry.entry.runtime_data.fingerprint
             await async_wait_node_entity_removals(
                 hass,
-                f"node:{fingerprint}:{entry.source_id}:{msg['node_id']}:",
+                fingerprint,
+                entry.source_id,
+                msg["node_id"],
             )
     connection.send_result(msg["id"], {"favorite": msg["favorite"]})
 

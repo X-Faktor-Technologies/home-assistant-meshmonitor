@@ -37,7 +37,10 @@ from custom_components.meshmonitor.device_tracker import MeshMonitorNodeTracker
 from custom_components.meshmonitor.device_tracker import (
     async_setup_entry as async_setup_trackers,
 )
-from custom_components.meshmonitor.entity import async_add_node_entities
+from custom_components.meshmonitor.entity import (
+    async_add_node_entities,
+    async_wait_node_entity_removals,
+)
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
     server_device_identifier,
@@ -125,18 +128,54 @@ async def test_dynamic_discovery_drops_entity_that_becomes_ineligible_while_wait
     entity = SimpleNamespace(unique_id="node-entity")
     state = SimpleNamespace(eligible=True)
     added: list[object] = []
+    stale: list[object] = []
 
     async_add_node_entities(
         hass,
         lambda entities: added.extend(entities),  # type: ignore[arg-type]
         [entity],  # type: ignore[list-item]
         is_current=lambda _: state.eligible,
+        on_stale=stale.append,
     )
     state.eligible = False
     gate.set()
     await hass.async_block_till_done()
 
     assert added == []
+    assert stale == [entity]
+
+
+async def test_removal_waits_use_exact_source_and_node_identity(
+    hass: HomeAssistant,
+) -> None:
+    """Delimiter-bearing source IDs cannot collide in retirement waits."""
+    target_gate = asyncio.Event()
+    other_gate = asyncio.Event()
+
+    async def wait_for(gate: asyncio.Event) -> None:
+        await gate.wait()
+
+    target = hass.async_create_task(wait_for(target_gate), "Remove target node entity")
+    other = hass.async_create_task(wait_for(other_gate), "Remove other node entity")
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data["node_entity_removals"] = {"target": target, "other": other}
+    domain_data["node_entity_removal_identities"] = {
+        "target": ("fingerprint", "source-a", "child"),
+        "other": ("fingerprint", "source-a:child", "node"),
+    }
+
+    waiter = hass.async_create_task(
+        async_wait_node_entity_removals(
+            hass, "fingerprint", "source-a", "child"
+        ),
+        "Wait for target removal",
+    )
+    target_gate.set()
+    await waiter
+
+    assert not other.done()
+    other_gate.set()
+    await other
 
 
 async def test_confirmed_favorite_write_updates_coordinator_memory(

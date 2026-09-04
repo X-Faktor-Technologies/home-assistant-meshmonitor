@@ -802,7 +802,9 @@ async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> Non
     reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
     wait_for_removal.assert_awaited_once_with(
         hass,
-        "node:fingerprint:source-1:remote:",
+        "fingerprint",
+        "source-1",
+        "remote",
     )
     hass.config_entries.async_reload.assert_not_awaited()
     connection.send_result.assert_called_once_with(8, {"favorite": False})

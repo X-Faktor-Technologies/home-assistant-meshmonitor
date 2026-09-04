@@ -24,6 +24,7 @@ from .registry import (
 from .vendor_meshmonitor_client import Node
 
 _NODE_ENTITY_REMOVALS = "node_entity_removals"
+_NODE_ENTITY_REMOVAL_IDENTITIES = "node_entity_removal_identities"
 
 
 def async_add_node_entities(
@@ -31,12 +32,21 @@ def async_add_node_entities(
     async_add_entities: AddEntitiesCallback,
     entities: Iterable[Entity],
     is_current: Callable[[Entity], bool] | None = None,
+    on_stale: Callable[[Entity], None] | None = None,
 ) -> None:
     """Add entities only after matching in-flight removals have completed."""
     batch = tuple(entities)
 
     def current_batch() -> tuple[Entity, ...]:
-        return batch if is_current is None else tuple(filter(is_current, batch))
+        if is_current is None:
+            return batch
+        current: list[Entity] = []
+        for entity in batch:
+            if is_current(entity):
+                current.append(entity)
+            elif on_stale is not None:
+                on_stale(entity)
+        return tuple(current)
 
     removals: dict[str, asyncio.Task[None]] = hass.data.setdefault(DOMAIN, {}).setdefault(
         _NODE_ENTITY_REMOVALS, {}
@@ -65,14 +75,23 @@ def async_add_node_entities(
 
 
 async def async_wait_node_entity_removals(
-    hass: HomeAssistant, unique_id_prefix: str
+    hass: HomeAssistant,
+    fingerprint: str,
+    source_id: str,
+    node_id: str,
 ) -> None:
     """Wait for one node's active platform entities to finish retiring."""
     removals: dict[str, asyncio.Task[None]] = hass.data.setdefault(DOMAIN, {}).setdefault(
         _NODE_ENTITY_REMOVALS, {}
     )
+    identities: dict[str, tuple[str, str, str]] = hass.data.setdefault(
+        DOMAIN, {}
+    ).setdefault(_NODE_ENTITY_REMOVAL_IDENTITIES, {})
+    identity = (fingerprint, source_id, node_id)
     pending = tuple(
-        task for unique_id, task in removals.items() if unique_id.startswith(unique_id_prefix)
+        task
+        for unique_id, task in removals.items()
+        if identities.get(unique_id) == identity
     )
     if pending:
         await asyncio.gather(*pending)
@@ -131,6 +150,7 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
         self.node_id = node.id
         self._removal_requested = False
         fingerprint = server_fingerprint(source.data["url"])
+        self._removal_identity = (fingerprint, source.source_id, node.id)
         self._attr_unique_id = node_entity_unique_id(fingerprint, source.source_id, node.id, key)
         self._attr_device_info = node_device_info(source, node)
 
@@ -157,6 +177,9 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
                 removals: dict[str, asyncio.Task[None]] = self.hass.data.setdefault(
                     DOMAIN, {}
                 ).setdefault(_NODE_ENTITY_REMOVALS, {})
+                identities: dict[str, tuple[str, str, str]] = self.hass.data.setdefault(
+                    DOMAIN, {}
+                ).setdefault(_NODE_ENTITY_REMOVAL_IDENTITIES, {})
                 task = self.hass.async_create_task(
                     self.async_remove(force_remove=True),
                     f"Remove retired MeshMonitor node entity {self.unique_id}",
@@ -165,10 +188,12 @@ class MeshMonitorNodeEntity(CoordinatorEntity[MeshMonitorCoordinator]):
                 if self.unique_id is not None:
                     unique_id = self.unique_id
                     removals[unique_id] = task
+                    identities[unique_id] = self._removal_identity
 
                     def clear_removal(done: asyncio.Task[None]) -> None:
                         if removals.get(unique_id) is done:
                             removals.pop(unique_id, None)
+                            identities.pop(unique_id, None)
 
                     task.add_done_callback(clear_removal)
             return

@@ -223,7 +223,16 @@ async def async_setup_entry(
                     )
 
                 async_add_node_entities(
-                    hass, async_add_entities, entities, is_current=is_current
+                    hass,
+                    async_add_entities,
+                    entities,
+                    is_current=is_current,
+                    on_stale=lambda entity: known.discard(
+                        (
+                            getattr(entity, "node_id", ""),
+                            getattr(getattr(entity, "entity_description", None), "key", ""),
+                        )
+                    ),
                 )
 
         _add_new_nodes()
