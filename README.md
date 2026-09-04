@@ -172,7 +172,9 @@ The sidebar panel has four views:
 
 - **Overview** shows which sources are connected, recent node activity,
   positions, firmware information, and anything that needs attention.
-- **Messages** groups channel and direct-message history across your sources.
+- **Messages** groups channel and direct-message history across your sources,
+  preserves drafts and scroll position during refreshes, and provides a
+  keyboard-accessible jump to the newest message.
 - **Nodes** provides search, sorting, favorites, details, telemetry, and links
   back to MeshMonitor.
 - **Map** shows current positions, stored links, and optional position trails.

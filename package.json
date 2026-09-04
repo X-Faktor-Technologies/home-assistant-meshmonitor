@@ -1,0 +1,8 @@
+{
+  "name": "home-assistant-meshmonitor-repository-tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "markdownlint-cli2": "0.23.2"
+  }
+}

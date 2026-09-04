@@ -2,13 +2,12 @@
 
 ## Supported versions
 
-This project is pre-1.0 and currently has no published release. After release,
-only the latest published version will receive security fixes; older versions
-should be upgraded before support is requested.
+This project is pre-1.0. Only the latest published version receives security
+fixes; older versions should be upgraded before support is requested.
 
 | Version | Security fixes |
 | --- | --- |
-| Latest published release, once available | Yes |
+| Latest published release | Yes |
 | Older releases and development snapshots | No |
 
 The current source may describe an unreleased candidate. Its presence in the
@@ -16,12 +15,11 @@ repository is not a release or a support commitment.
 
 ## Report a vulnerability privately
 
-After the public repository enables it, use GitHub **Private vulnerability
-reporting** from the repository's **Security** tab. Do not open a public issue,
-discussion, or pull request for a suspected vulnerability. Before that private
-reporting route exists, arrange a private channel with the project owner before
-sending details; if no private channel is available, retain the report rather
-than disclosing live-system or exploit details publicly.
+Use GitHub **Private vulnerability reporting** from the repository's
+**Security** tab. Do not open a public issue, discussion, or pull request for a
+suspected vulnerability. If that route is temporarily unavailable, arrange a
+private channel with the project owner before sending details; otherwise retain
+the report rather than disclosing live-system or exploit details publicly.
 
 Include:
 

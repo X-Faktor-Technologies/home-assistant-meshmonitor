@@ -1,8 +1,7 @@
 # Support policy
 
-MeshMonitor for Home Assistant is a pre-1.0 community integration. There is
-currently no supported public distribution. After release, support will be
-best effort and cover the latest published integration on its documented
+MeshMonitor for Home Assistant is a pre-1.0 community integration. Support is
+best effort and covers the latest published integration on its documented
 minimum Home Assistant version or newer, using a MeshMonitor version compatible
 with the verified API contract in the README. Development snapshots and older
 releases may be useful for testing but are not supported versions.
@@ -23,9 +22,8 @@ releases may be useful for testing but are not supported versions.
   firmware, RF coverage, channel keys, MeshMonitor installation, source or
   transport administration, backups, or database maintenance.
 
-The source repository is public, but there is not yet a supported tagged
-release or package. Reports based on an untagged checkout may be closed if the
-same problem cannot be reproduced on the first supported release.
+Reports based on an untagged checkout may be closed if the same problem cannot
+be reproduced on the latest published release.
 
 ## Information to include
 
