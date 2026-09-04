@@ -20,6 +20,7 @@ from .registry import (
     async_get_device_by_identifier,
     device_belongs_to_config_entry,
     node_device_identifier,
+    source_device_identifier,
 )
 from .vendor_meshmonitor_client import Node
 
@@ -113,13 +114,21 @@ def registry_reconciliation_plan(
             if device is not None:
                 device_ids.add(device.id)
 
-        node_prefix = f"node:{fingerprint}:{source.source_id}:"
+        source_device = async_get_device_by_identifier(
+            device_registry,
+            source_device_identifier(fingerprint, source.source_id),
+            entry.entry_id,
+        )
+        if source_device is None:
+            continue
         for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+            if device.via_device_id != source_device.id:
+                continue
             scoped_identifiers = {
                 (domain, identifier)
                 for domain, identifier in device.identifiers
                 if domain == "meshmonitor"
-                and identifier.startswith(node_prefix)
+                and identifier.startswith(f"node:{fingerprint}:")
             }
             if scoped_identifiers and scoped_identifiers.isdisjoint(active_identifiers):
                 device_ids.add(device.id)
