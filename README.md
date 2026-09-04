@@ -9,8 +9,10 @@ MeshMonitor still handles radio setup, channels, credentials, firmware, and
 server administration. This integration is meant to make day-to-day monitoring
 easy.
 
-The first stable public release is `0.16.0`. Back up Home Assistant before
-installing or upgrading a custom integration.
+- **Latest stable:** `v0.16.0`
+- **Current pre-release:** `v0.17.0-rc.1`
+
+Back up Home Assistant before installing or upgrading a custom integration.
 
 ## Highlights
 
@@ -34,13 +36,13 @@ The data in these screenshots is fictional. The images use the real
 MeshMonitor panel without exposing a live network. See the
 [screenshot notes](docs/images/README.md) for details.
 
-![MeshMonitor Overview showing source health and activity across a fictional mesh network](docs/images/panel-overview.png)
+![MeshMonitor Overview showing source health and activity across a fictional mesh network](docs/images/panel-overview-v0.17.png)
 
-![MeshMonitor Messages showing a fictional conversation and source filters](docs/images/panel-conversations.png)
+![MeshMonitor Messages showing a fictional conversation and source filters](docs/images/panel-conversations-v0.17.png)
 
-![MeshMonitor Nodes showing a searchable fictional node list](docs/images/panel-nodes.png)
+![MeshMonitor Nodes showing a searchable fictional node list](docs/images/panel-nodes-v0.17.png)
 
-![MeshMonitor Map showing fictional nodes and links](docs/images/panel-map.png)
+![MeshMonitor Map showing fictional nodes and links](docs/images/panel-map-v0.17.png)
 
 ## What you need
 

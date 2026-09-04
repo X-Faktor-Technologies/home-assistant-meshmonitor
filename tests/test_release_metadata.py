@@ -232,7 +232,7 @@ def test_documentation_screenshots_reject_trailing_data(tmp_path: Path) -> None:
     """Reject PNG payloads that can hide unreviewed trailing content."""
     image_dir = tmp_path / "docs" / "images"
     shutil.copytree(ROOT / "docs" / "images", image_dir)
-    screenshot = image_dir / "panel-overview.png"
+    screenshot = image_dir / "panel-overview-v0.17.png"
     screenshot.write_bytes(screenshot.read_bytes() + b"private trailing data")
 
     problems = screenshot_problems(tmp_path)
@@ -245,7 +245,7 @@ def test_documentation_screenshots_reject_unknown_ancillary_chunks(
     """Reject unreviewed PNG chunks even when their CRC is valid."""
     image_dir = tmp_path / "docs" / "images"
     shutil.copytree(ROOT / "docs" / "images", image_dir)
-    screenshot = image_dir / "panel-overview.png"
+    screenshot = image_dir / "panel-overview-v0.17.png"
     data = screenshot.read_bytes()
     payload = b"hidden metadata"
     chunk_type = b"vpAg"

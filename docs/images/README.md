@@ -36,6 +36,10 @@ new images:
    the Map image visibly identifies its tile-free privacy mode.
 5. Run the repository validation suite.
 
+Panel screenshot filenames include their documentation release series. When a
+panel image changes, update that suffix along with every reference so HACS and
+browser caches cannot silently reuse an older image.
+
 The checked-in panel images were rendered with Brave 152.1.94.117. A different
 Chromium build may render fonts differently even when the fixture data and
 layout are unchanged.
@@ -50,13 +54,13 @@ coverage or performance claims.
 ## SHA-256 checksums
 
 - `a7e75a551e9fd0afaa1035b39ccc9caf899f1ca15302103074cc70681a74199e`
-  (`panel-overview.png`)
+  (`panel-overview-v0.17.png`)
 - `0496d3e023a20cfb3ff856db8b4eea9b6e5adcf1ab95e83dbd584df88b6d17b6`
-  (`panel-conversations.png`)
+  (`panel-conversations-v0.17.png`)
 - `6440ebeab36f307568ac4b43283043b9389a1c58ea205e2ae5981779f567ceb5`
-  (`panel-nodes.png`)
+  (`panel-nodes-v0.17.png`)
 - `204b1d9c513e7a50b4374d56aacf20ac273290f0815e8e4bcf601034ee1d1c63`
-  (`panel-map.png`)
+  (`panel-map-v0.17.png`)
 - `a0fcc4ba87a31bbc76ff580edb8a9693c4f6c803fefba11ebce8edcd9aa6593a`
   (`setup-find-integration.png`)
 - `a10bac251bec19ca5db17fade56c1ef9e51f464d9fa3ca0d03170263365e54f2`

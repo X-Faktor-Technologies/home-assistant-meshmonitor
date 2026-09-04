@@ -35,10 +35,10 @@ REQUIRED_ARCHIVE_FILES = {
     "vendor_meshmonitor_client/py.typed",
 }
 DOCUMENTED_SCREENSHOTS = {
-    "panel-overview.png": (1440, 900),
-    "panel-conversations.png": (1440, 900),
-    "panel-nodes.png": (1440, 900),
-    "panel-map.png": (1600, 900),
+    "panel-overview-v0.17.png": (1440, 900),
+    "panel-conversations-v0.17.png": (1440, 900),
+    "panel-nodes-v0.17.png": (1440, 900),
+    "panel-map-v0.17.png": (1600, 900),
     "setup-connect.png": (580, 404),
     "setup-find-integration.png": (580, 520),
     "setup-options-menu.png": (580, 272),

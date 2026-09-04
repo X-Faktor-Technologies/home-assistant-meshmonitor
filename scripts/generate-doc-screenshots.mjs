@@ -140,10 +140,10 @@ const capture = (tab, filename, directory, width = 1440) => new Promise((resolve
 });
 
 const captures = [
-  ["overview", "panel-overview.png", 1440],
-  ["messages", "panel-conversations.png", 1440],
-  ["nodes", "panel-nodes.png", 1440],
-  ["map", "panel-map.png", 1600],
+  ["overview", "panel-overview-v0.17.png", 1440],
+  ["messages", "panel-conversations-v0.17.png", 1440],
+  ["nodes", "panel-nodes-v0.17.png", 1440],
+  ["map", "panel-map-v0.17.png", 1600],
 ];
 const staging = await mkdtemp(join(output, ".screenshot-stage-"));
 
