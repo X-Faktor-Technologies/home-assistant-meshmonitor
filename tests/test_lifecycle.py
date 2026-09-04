@@ -24,6 +24,7 @@ from custom_components.meshmonitor.const import (
     NODE_DEVICE_POLICY_ALL,
 )
 from custom_components.meshmonitor.registry import (
+    async_get_device_by_identifier,
     node_device_identifier,
     node_entity_unique_id,
     server_fingerprint,
@@ -276,16 +277,16 @@ async def test_platform_registry_persists_across_failure_reappearance_and_restar
         (server_b, fingerprint_b, ("source-a",)),
     ):
         for source_id in source_ids:
-            source_device = device_registry.async_get_device(
-                identifiers={source_device_identifier(fingerprint, source_id)}
+            source_device = async_get_device_by_identifier(
+                device_registry,
+                source_device_identifier(fingerprint, source_id),
+                entry.entry_id,
             )
             assert source_device is not None
-            node_device = device_registry.async_get_device(
-                identifiers={
-                    node_device_identifier(
-                        fingerprint, source_id, "shared-node"
-                    )
-                }
+            node_device = async_get_device_by_identifier(
+                device_registry,
+                node_device_identifier(fingerprint, source_id, "shared-node"),
+                entry.entry_id,
             )
             assert node_device is not None
             assert node_device.via_device_id == source_device.id

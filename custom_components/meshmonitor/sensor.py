@@ -208,7 +208,7 @@ async def async_setup_entry(
                     )
                     entities.append(
                         MeshMonitorNodeSensor(
-                            coordinator, source, node, description, plans[unique_id]
+                            hass, coordinator, source, node, description, plans[unique_id]
                         )
                     )
             if entities:
@@ -287,13 +287,14 @@ class MeshMonitorNodeSensor(MeshMonitorNodeEntity, SensorEntity):
 
     def __init__(
         self,
+        hass: HomeAssistant,
         coordinator: MeshMonitorCoordinator,
         source: MeshMonitorSourceRuntime,
         node: Node,
         description: MeshMonitorSensorDescription,
         entity_id: str,
     ) -> None:
-        super().__init__(coordinator, source, node, description.key)
+        super().__init__(hass, coordinator, source, node, description.key)
         self.entity_description = description
         self.source_type = source.source_type
         self.entity_id = entity_id

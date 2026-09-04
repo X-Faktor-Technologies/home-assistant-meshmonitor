@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adopt Home Assistant 2026.9's config-entry-scoped device lookups and concrete
+  parent-device IDs while preserving the existing source and node hierarchy.
 - Keep the Messages composer stable during background refreshes, open selected
   and sent conversations at the latest message, provide an accessible jump to
   the latest message, use a compact mobile layout, size message bubbles to their

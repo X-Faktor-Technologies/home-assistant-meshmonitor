@@ -45,6 +45,7 @@ from .node_event_monitor import MeshMonitorNodeEventMonitor
 from .notification_manager import MeshMonitorNotificationManager
 from .panel import async_register_panel, async_remove_panel
 from .registry import (
+    async_get_device_by_identifier,
     node_device_identifier,
     server_device_identifier,
     server_fingerprint,
@@ -351,16 +352,22 @@ def _async_create_and_migrate_source_devices(
         if local_node is None:
             continue
         old_identifier = node_device_identifier(fingerprint, source.source_id, local_node.id)
-        old_device = registry.async_get_device(identifiers={old_identifier})
-        if old_device is None or old_device.config_entries != {entry.entry_id}:
+        old_device = async_get_device_by_identifier(
+            registry,
+            old_identifier, entry.entry_id
+        )
+        if old_device is None:
             continue
         for entity in tuple(entities.entities.values()):
             if entity.config_entry_id == entry.entry_id and entity.device_id == old_device.id:
                 entities.async_update_entity(entity.entity_id, device_id=source_device.id)
         registry.async_remove_device(old_device.id)
 
-    server_device = registry.async_get_device(identifiers={server_device_identifier(fingerprint)})
-    if server_device is not None and server_device.config_entries == {entry.entry_id}:
+    server_device = async_get_device_by_identifier(
+        registry,
+        server_device_identifier(fingerprint), entry.entry_id
+    )
+    if server_device is not None:
         registry.async_remove_device(server_device.id)
 
 

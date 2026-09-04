@@ -45,7 +45,11 @@ from .const import (
 )
 from .firmware_updates import update_presentation
 from .notification_manager import MeshMonitorNotificationManager
-from .registry import node_device_identifier, server_fingerprint
+from .registry import (
+    async_get_device_by_identifier,
+    node_device_identifier,
+    server_fingerprint,
+)
 from .server_health_coordinator import ServerCheck, ServerHealthData
 from .transmit import (
     TransmitGuardError,
@@ -472,14 +476,14 @@ def _serialize_entry(
                     device.id
                     if device_registry
                     and (
-                        device := device_registry.async_get_device(
-                            identifiers={
-                                node_device_identifier(
-                                    server_fingerprint(entry.data.get(CONF_URL, "")),
-                                    source_id,
-                                    node.id,
-                                )
-                            }
+                        device := async_get_device_by_identifier(
+                            device_registry,
+                            node_device_identifier(
+                                server_fingerprint(entry.data.get(CONF_URL, "")),
+                                source_id,
+                                node.id,
+                            ),
+                            entry.entry_id,
                         )
                     )
                     else None

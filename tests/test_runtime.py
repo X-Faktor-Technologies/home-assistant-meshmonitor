@@ -42,7 +42,9 @@ from custom_components.meshmonitor.entity import (
     async_wait_node_entity_removals,
 )
 from custom_components.meshmonitor.registry import (
+    async_get_device_by_identifier,
     node_device_identifier,
+    node_parent_device_info,
     server_device_identifier,
     server_fingerprint,
     source_device_identifier,
@@ -261,8 +263,8 @@ async def test_setup_serializes_sources_keeps_failed_sibling_and_creates_sources
     fingerprint = server_fingerprint("https://mesh.invalid")
     registry = dr.async_get(hass)
     for source_id in ("source-a", "source-b"):
-        source = registry.async_get_device(
-            identifiers={source_device_identifier(fingerprint, source_id)}
+        source = async_get_device_by_identifier(
+            registry, source_device_identifier(fingerprint, source_id), entry.entry_id
         )
         assert source is not None
         assert source.via_device_id is None
@@ -332,13 +334,13 @@ async def test_device_model_migration_preserves_local_entity_registry_identity(
     source_device = devices.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={source_identifier},
-        via_device=server_identifier,
+        **node_parent_device_info(devices, server_identifier, entry.entry_id),
     )
     local_identifier = node_device_identifier(fingerprint, "source-a", "!000004d2")
     old_local_device = devices.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={local_identifier},
-        via_device=source_identifier,
+        **node_parent_device_info(devices, source_identifier, entry.entry_id),
     )
     entity = entities.async_get_or_create(
         "sensor",

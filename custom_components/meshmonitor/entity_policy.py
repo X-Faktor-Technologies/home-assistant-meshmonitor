@@ -16,7 +16,12 @@ from .const import (
     NODE_DEVICE_POLICY_ALL,
     NODE_DEVICE_POLICY_FAVORITES,
 )
-from .registry import node_device_identifier, source_device_identifier
+from .registry import (
+    async_get_device_by_identifier,
+    device_belongs_to_config_entry,
+    node_device_identifier,
+    source_device_identifier,
+)
 from .vendor_meshmonitor_client import Node
 
 if TYPE_CHECKING:
@@ -102,20 +107,22 @@ def registry_reconciliation_plan(
             if node_entities_enabled(source, node, policy):
                 continue
             identifier = node_device_identifier(fingerprint, source.source_id, node.id)
-            device = device_registry.async_get_device(identifiers={identifier})
-            if device is not None and device.config_entries == {entry.entry_id}:
+            device = async_get_device_by_identifier(
+                device_registry,
+                identifier, entry.entry_id
+            )
+            if device is not None:
                 device_ids.add(device.id)
 
-        source_device = device_registry.async_get_device(
-            identifiers={source_device_identifier(fingerprint, source.source_id)}
+        source_device = async_get_device_by_identifier(
+            device_registry,
+            source_device_identifier(fingerprint, source.source_id),
+            entry.entry_id,
         )
         if source_device is None:
             continue
-        for device in device_registry.devices.values():
-            if (
-                device.config_entries != {entry.entry_id}
-                or device.via_device_id != source_device.id
-            ):
+        for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+            if device.via_device_id != source_device.id:
                 continue
             scoped_identifiers = {
                 (domain, identifier)
@@ -147,6 +154,8 @@ def async_reconcile_node_registries(
         entity_registry.async_remove(entity_id)
     for device_id in sorted(plan.device_ids):
         device = device_registry.async_get(device_id)
-        if device is not None and device.config_entries == {entry.entry_id}:
+        if device is not None and device_belongs_to_config_entry(
+            device, entry.entry_id
+        ):
             device_registry.async_remove_device(device_id)
     return plan
