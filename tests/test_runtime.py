@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from homeassistant.const import CONF_TOKEN, CONF_URL
@@ -28,6 +30,16 @@ from custom_components.meshmonitor.const import (
     CONF_SOURCES,
     DOMAIN,
     NODE_DEVICE_POLICY_ALL,
+    NODE_DEVICE_POLICY_FAVORITES,
+)
+from custom_components.meshmonitor.coordinator import MeshMonitorCoordinator
+from custom_components.meshmonitor.device_tracker import MeshMonitorNodeTracker
+from custom_components.meshmonitor.device_tracker import (
+    async_setup_entry as async_setup_trackers,
+)
+from custom_components.meshmonitor.entity import (
+    async_add_node_entities,
+    async_wait_node_entity_removals,
 )
 from custom_components.meshmonitor.registry import (
     node_device_identifier,
@@ -74,6 +86,123 @@ def _entry(*, options: dict[str, object] | None = None) -> MockConfigEntry:
         version=2,
         unique_id=server_fingerprint("https://mesh.invalid"),
     )
+
+
+async def test_dynamic_discovery_waits_for_matching_entity_removal(
+    hass: HomeAssistant,
+) -> None:
+    """A rediscovered unique ID is added only after its old platform object exits."""
+    gate = asyncio.Event()
+
+    async def remove_old_entity() -> None:
+        await gate.wait()
+
+    removal = hass.async_create_task(remove_old_entity(), "Remove old node entity")
+    hass.data.setdefault(DOMAIN, {})["node_entity_removals"] = {"node-entity": removal}
+    entity = SimpleNamespace(unique_id="node-entity")
+    added: list[object] = []
+
+    async_add_node_entities(
+        hass,
+        lambda entities: added.extend(entities),  # type: ignore[arg-type]
+        [entity],  # type: ignore[list-item]
+    )
+    assert added == []
+
+    gate.set()
+    await hass.async_block_till_done()
+    assert added == [entity]
+
+
+async def test_dynamic_discovery_drops_entity_that_becomes_ineligible_while_waiting(
+    hass: HomeAssistant,
+) -> None:
+    """A stale queued rediscovery cannot resurrect an ineligible entity."""
+    gate = asyncio.Event()
+
+    async def remove_old_entity() -> None:
+        await gate.wait()
+
+    removal = hass.async_create_task(remove_old_entity(), "Remove old node entity")
+    hass.data.setdefault(DOMAIN, {})["node_entity_removals"] = {"node-entity": removal}
+    entity = SimpleNamespace(unique_id="node-entity")
+    state = SimpleNamespace(eligible=True)
+    added: list[object] = []
+    stale: list[object] = []
+
+    async_add_node_entities(
+        hass,
+        lambda entities: added.extend(entities),  # type: ignore[arg-type]
+        [entity],  # type: ignore[list-item]
+        is_current=lambda _: state.eligible,
+        on_stale=stale.append,
+    )
+    state.eligible = False
+    gate.set()
+    await hass.async_block_till_done()
+
+    assert added == []
+    assert stale == [entity]
+
+
+async def test_removal_waits_use_exact_source_and_node_identity(
+    hass: HomeAssistant,
+) -> None:
+    """Delimiter-bearing source IDs cannot collide in retirement waits."""
+    target_gate = asyncio.Event()
+    other_gate = asyncio.Event()
+
+    async def wait_for(gate: asyncio.Event) -> None:
+        await gate.wait()
+
+    target = hass.async_create_task(wait_for(target_gate), "Remove target node entity")
+    other = hass.async_create_task(wait_for(other_gate), "Remove other node entity")
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data["node_entity_removals"] = {"target": target, "other": other}
+    domain_data["node_entity_removal_identities"] = {
+        "target": ("fingerprint", "source-a", "child"),
+        "other": ("fingerprint", "source-a:child", "node"),
+    }
+
+    waiter = hass.async_create_task(
+        async_wait_node_entity_removals(
+            hass, "fingerprint", "source-a", "child"
+        ),
+        "Wait for target removal",
+    )
+    target_gate.set()
+    await waiter
+
+    assert not other.done()
+    other_gate.set()
+    await other
+
+
+async def test_confirmed_favorite_write_updates_coordinator_memory(
+    hass: HomeAssistant,
+) -> None:
+    """A confirmed write bypasses a temporarily stale follow-up API snapshot."""
+    node = Node.from_dict({"id": "node-1", "isFavorite": False})
+    snapshot = SourceSnapshot.create(
+        "source-a",
+        SourceStatus.from_dict({"connected": True, "localNodeId": "local"}),
+        [node],
+        None,
+        [],
+        {},
+    )
+    coordinator = MeshMonitorCoordinator(
+        hass, Mock(), "source-a", "meshcore"
+    )
+    coordinator.async_set_updated_data(snapshot)
+    listener = Mock()
+    coordinator.async_add_listener(listener)
+
+    coordinator.async_set_node_favorite("node-1", True)
+
+    assert coordinator.nodes["node-1"].is_favorite is True
+    assert coordinator.nodes["node-1"].raw["isFavorite"] is True
+    listener.assert_called_once_with()
 
 
 async def test_setup_serializes_sources_keeps_failed_sibling_and_creates_sources(
@@ -353,6 +482,260 @@ async def test_sensor_platform_batches_sources_and_attaches_nodes_to_exact_sourc
         source_device_identifier(fingerprint, "source-b"),
     }
     assert all("via_device" not in entity.device_info for entity in last_heard)
+
+
+async def test_sensor_discovery_readds_node_after_favorite_policy_removal(
+    hass: HomeAssistant,
+) -> None:
+    """An ineligible interval must not permanently suppress rediscovery."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {
+                CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_FAVORITES
+            },
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    favorite = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "lastHeard": "2026-08-17T12:00:00Z",
+            "isFavorite": True,
+        }
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={favorite.id: favorite},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_sensors(hass, entry, add_entities)  # type: ignore[arg-type]
+    listener = coordinator.async_add_listener.call_args.args[0]
+    initial_count = len(added)
+    assert sum(getattr(entity, "node_id", None) == favorite.id for entity in added) == 1
+
+    coordinator.nodes = {
+        favorite.id: Node.from_dict(
+            {
+                "id": favorite.id,
+                "longName": "Mobile node",
+                "lastHeard": "2026-08-17T12:00:00Z",
+                "isFavorite": False,
+            }
+        )
+    }
+    listener()
+    assert len(added) == initial_count
+
+    coordinator.nodes = {favorite.id: favorite}
+    listener()
+    assert len(added) == initial_count + 1
+    assert sum(getattr(entity, "node_id", None) == favorite.id for entity in added) == 2
+
+
+async def test_sensor_discovery_keeps_existing_sensor_during_value_loss(
+    hass: HomeAssistant,
+) -> None:
+    """A transient missing value does not rediscover an active node sensor."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_ALL},
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    reported = Node.from_dict(
+        {"id": "node-1", "longName": "Mobile node", "batteryLevel": 50}
+    )
+    missing = Node.from_dict({"id": reported.id, "longName": "Mobile node"})
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={reported.id: reported},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added: list[object] = []
+
+    await async_setup_sensors(
+        hass,
+        entry,
+        lambda entities: added.extend(entities),  # type: ignore[arg-type]
+    )
+    listener = coordinator.async_add_listener.call_args.args[0]
+    assert sum(
+        getattr(getattr(entity, "entity_description", None), "key", None) == "battery"
+        for entity in added
+    ) == 1
+
+    coordinator.nodes = {missing.id: missing}
+    listener()
+    coordinator.nodes = {
+        reported.id: Node.from_dict(
+            {"id": reported.id, "longName": "Mobile node", "batteryLevel": 51}
+        )
+    }
+    listener()
+
+    assert sum(
+        getattr(getattr(entity, "entity_description", None), "key", None) == "battery"
+        for entity in added
+    ) == 1
+
+
+async def test_tracker_discovery_keeps_existing_tracker_during_coordinate_loss(
+    hass: HomeAssistant,
+) -> None:
+    """A coordinate gap does not rediscover an active node tracker."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_ALL},
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    positioned = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+        }
+    )
+    unpositioned = Node.from_dict(
+        {"id": positioned.id, "longName": "Mobile node"}
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={unpositioned.id: unpositioned},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added: list[object] = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_trackers(hass, entry, add_entities)  # type: ignore[arg-type]
+    listener = coordinator.async_add_listener.call_args.args[0]
+    assert added == []
+
+    coordinator.nodes = {positioned.id: positioned}
+    listener()
+    assert len(added) == 1
+
+    coordinator.nodes = {unpositioned.id: unpositioned}
+    listener()
+    coordinator.nodes = {positioned.id: positioned}
+    listener()
+
+    assert len(added) == 1
+
+
+async def test_tracker_rediscovery_waits_for_authoritative_removal(
+    hass: HomeAssistant,
+) -> None:
+    """A retired tracker exits before the same tracker identity is rediscovered."""
+    entry = _entry(
+        options={
+            CONF_SERVER_OPTIONS: {
+                CONF_NODE_DEVICE_POLICY: NODE_DEVICE_POLICY_FAVORITES
+            },
+            CONF_SOURCE_OPTIONS: {},
+        }
+    )
+    entry.add_to_hass(hass)
+    favorite = Node.from_dict(
+        {
+            "id": "node-1",
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+            "isFavorite": True,
+        }
+    )
+    ineligible = Node.from_dict(
+        {
+            "id": favorite.id,
+            "longName": "Mobile node",
+            "latitude": 40.0,
+            "longitude": -74.0,
+            "isFavorite": False,
+        }
+    )
+    coordinator = Mock(
+        data=SimpleNamespace(status=SimpleNamespace(local_node_id="local")),
+        nodes={favorite.id: favorite},
+        last_update_success=True,
+        async_add_listener=Mock(return_value=Mock()),
+    )
+    source = MeshMonitorSourceRuntime(
+        entry, Mock(), coordinator, "source-a", "Alpha", "meshtastic"
+    )
+    entry.runtime_data = MeshMonitorRuntimeData(
+        source.client,
+        server_fingerprint(entry.data[CONF_URL]),
+        {source.source_id: source},
+    )
+    added: list[MeshMonitorNodeTracker] = []
+
+    def add_entities(entities: object) -> None:
+        added.extend(entities)  # type: ignore[arg-type]
+
+    await async_setup_trackers(hass, entry, add_entities)  # type: ignore[arg-type]
+    tracker = added[0]
+    tracker.hass = hass
+    listener = coordinator.async_add_listener.call_args.args[0]
+    removal_gate = asyncio.Event()
+
+    async def remove_tracker(**_: object) -> None:
+        await removal_gate.wait()
+
+    coordinator.nodes = {ineligible.id: ineligible}
+    with patch.object(tracker, "async_remove", AsyncMock(side_effect=remove_tracker)):
+        tracker._handle_coordinator_update()
+        assert tracker.async_remove.await_count == 1
+
+        listener()
+        coordinator.nodes = {favorite.id: favorite}
+        listener()
+        assert len(added) == 1
+
+        removal_gate.set()
+        await hass.async_block_till_done()
+
+    assert len(added) == 2
+    assert added[1].unique_id == tracker.unique_id
 
 
 async def test_shared_message_runtime_uses_server_interval_and_enabled_sources(

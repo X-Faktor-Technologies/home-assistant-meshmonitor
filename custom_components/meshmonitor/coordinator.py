@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -58,6 +59,25 @@ class MeshMonitorCoordinator(DataUpdateCoordinator[SourceSnapshot | ReticulumSna
             return {}
         nodes = getattr(self.data, "nodes", ())
         return {node.id: node for node in nodes}
+
+    def async_set_node_favorite(self, node_id: str, favorite: bool) -> None:
+        """Publish one confirmed favorite write without waiting for API cache expiry."""
+        snapshot = self.data
+        if not isinstance(snapshot, SourceSnapshot):
+            return
+        nodes = tuple(
+            replace(
+                node,
+                is_favorite=favorite,
+                raw={**node.raw, "isFavorite": favorite},
+            )
+            if node.id == node_id
+            else node
+            for node in snapshot.nodes
+        )
+        if not any(node.id == node_id for node in snapshot.nodes):
+            return
+        self.async_set_updated_data(replace(snapshot, nodes=nodes))
 
     async def _async_update_data(self) -> SourceSnapshot | ReticulumSnapshot:
         snapshot: SourceSnapshot | ReticulumSnapshot

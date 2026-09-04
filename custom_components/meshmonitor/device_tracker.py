@@ -6,6 +6,7 @@ from homeassistant.components.device_tracker import TrackerEntity  # type: ignor
 from homeassistant.components.device_tracker.const import SourceType
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (
@@ -16,7 +17,7 @@ from . import (
 )
 from .const import CONF_ENABLE_DEVICE_TRACKERS
 from .coordinator import MeshMonitorCoordinator
-from .entity import MeshMonitorNodeEntity
+from .entity import MeshMonitorNodeEntity, async_add_node_entities
 from .entity_policy import node_entities_enabled
 from .registry import (
     entity_id_reservations,
@@ -51,6 +52,12 @@ async def async_setup_entry(
             planning_sources: tuple[MeshMonitorSourceRuntime, ...] = planning_sources,
         ) -> None:
             fingerprint = server_fingerprint(source.data["url"])
+            eligible = {
+                node.id
+                for node in coordinator.nodes.values()
+                if node_entities_enabled(source, node)
+            }
+            known.intersection_update(eligible)
             specs = [
                 node_entity_id_spec(
                     domain="device_tracker",
@@ -85,7 +92,26 @@ async def async_setup_entry(
                     )
                 )
             if entities:
-                async_add_entities(entities)
+                def is_current(entity: Entity) -> bool:
+                    if not isinstance(entity, MeshMonitorNodeTracker):
+                        return False
+                    node = entity.node
+                    return bool(
+                        node is not None
+                        and node_entities_enabled(source, node)
+                        and node.latitude is not None
+                        and node.longitude is not None
+                    )
+
+                async_add_node_entities(
+                    hass,
+                    async_add_entities,
+                    entities,
+                    is_current=is_current,
+                    on_stale=lambda entity: known.discard(
+                        getattr(entity, "node_id", "")
+                    ),
+                )
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))
@@ -131,6 +157,12 @@ class MeshMonitorNodeTracker(MeshMonitorNodeEntity, TrackerEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Avoid recorder writes when a polled position is unchanged."""
+        node = self.node
+        if self.coordinator.last_update_success and (
+            node is None or not node_entities_enabled(self.source, node)
+        ):
+            super()._handle_coordinator_update()
+            return
         fingerprint = self._state_fingerprint()
         if fingerprint == self._last_written_fingerprint:
             return

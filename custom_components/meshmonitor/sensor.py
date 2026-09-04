@@ -16,6 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -27,7 +28,7 @@ from . import (
 )
 from .const import SOURCE_TYPE_RETICULUM
 from .coordinator import MeshMonitorCoordinator
-from .entity import MeshMonitorNodeEntity, source_device_info
+from .entity import MeshMonitorNodeEntity, async_add_node_entities, source_device_info
 from .entity_policy import node_entities_enabled
 from .registry import (
     EntityIdSpec,
@@ -187,6 +188,13 @@ async def async_setup_entry(
         ) -> None:
             plans = _sensor_entity_id_plans(registry, planning_sources, reservations)
             entities: list[MeshMonitorNodeSensor] = []
+            eligible = {
+                (node.id, description.key)
+                for node in coordinator.nodes.values()
+                if node_entities_enabled(source, node)
+                for description in NODE_SENSORS
+            }
+            known.intersection_update(eligible)
             for node in coordinator.nodes.values():
                 if not node_entities_enabled(source, node):
                     continue
@@ -204,7 +212,28 @@ async def async_setup_entry(
                         )
                     )
             if entities:
-                async_add_entities(entities)
+                def is_current(entity: Entity) -> bool:
+                    if not isinstance(entity, MeshMonitorNodeSensor):
+                        return False
+                    node = entity.node
+                    return bool(
+                        node is not None
+                        and node_entities_enabled(source, node)
+                        and entity.entity_description.value_fn(node) is not None
+                    )
+
+                async_add_node_entities(
+                    hass,
+                    async_add_entities,
+                    entities,
+                    is_current=is_current,
+                    on_stale=lambda entity: known.discard(
+                        (
+                            getattr(entity, "node_id", ""),
+                            getattr(getattr(entity, "entity_description", None), "key", ""),
+                        )
+                    ),
+                )
 
         _add_new_nodes()
         entry.async_on_unload(coordinator.async_add_listener(_add_new_nodes))

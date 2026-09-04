@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -16,7 +16,7 @@ from .const import (
     NODE_DEVICE_POLICY_ALL,
     NODE_DEVICE_POLICY_FAVORITES,
 )
-from .registry import node_device_identifier
+from .registry import node_device_identifier, source_device_identifier
 from .vendor_meshmonitor_client import Node
 
 if TYPE_CHECKING:
@@ -76,22 +76,54 @@ def registry_reconciliation_plan(
     hass: HomeAssistant,
     entry: MeshMonitorConfigEntry,
     policy: str | None = None,
+    source_ids: Collection[str] | None = None,
 ) -> RegistryReconciliationPlan:
-    """Plan exact ineligible node registry objects without changing state."""
+    """Plan exact ineligible or deleted node objects from complete snapshots."""
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
     fingerprint = entry.runtime_data.fingerprint
     device_ids: set[str] = set()
     for source in entry.runtime_data.sources.values():
+        if source_ids is not None and source.source_id not in source_ids:
+            continue
+        if (
+            getattr(source.coordinator, "last_update_success", False) is not True
+            or source.coordinator.data is None
+        ):
+            continue
         nodes = source.coordinator.nodes
         if not isinstance(nodes, Mapping):
             continue
+        active_identifiers = {
+            node_device_identifier(fingerprint, source.source_id, node.id)
+            for node in nodes.values()
+        }
         for node in nodes.values():
             if node_entities_enabled(source, node, policy):
                 continue
             identifier = node_device_identifier(fingerprint, source.source_id, node.id)
             device = device_registry.async_get_device(identifiers={identifier})
             if device is not None and device.config_entries == {entry.entry_id}:
+                device_ids.add(device.id)
+
+        source_device = device_registry.async_get_device(
+            identifiers={source_device_identifier(fingerprint, source.source_id)}
+        )
+        if source_device is None:
+            continue
+        for device in device_registry.devices.values():
+            if (
+                device.config_entries != {entry.entry_id}
+                or device.via_device_id != source_device.id
+            ):
+                continue
+            scoped_identifiers = {
+                (domain, identifier)
+                for domain, identifier in device.identifiers
+                if domain == "meshmonitor"
+                and identifier.startswith(f"node:{fingerprint}:")
+            }
+            if scoped_identifiers and scoped_identifiers.isdisjoint(active_identifiers):
                 device_ids.add(device.id)
 
     entity_ids = {
@@ -103,10 +135,12 @@ def registry_reconciliation_plan(
 
 
 def async_reconcile_node_registries(
-    hass: HomeAssistant, entry: MeshMonitorConfigEntry
+    hass: HomeAssistant,
+    entry: MeshMonitorConfigEntry,
+    source_ids: Collection[str] | None = None,
 ) -> RegistryReconciliationPlan:
-    """Remove only HA objects for currently known nodes that no longer qualify."""
-    plan = registry_reconciliation_plan(hass, entry)
+    """Remove only node objects retired by an authoritative source snapshot."""
+    plan = registry_reconciliation_plan(hass, entry, source_ids=source_ids)
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
     for entity_id in sorted(plan.entity_ids):

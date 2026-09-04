@@ -745,10 +745,12 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unfavorite_refreshes_source_and_reloads_favorites_policy() -> None:
+async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> None:
     client = Mock()
     client.set_meshtastic_favorite = AsyncMock(return_value=None)
-    coordinator = SimpleNamespace(async_request_refresh=AsyncMock())
+    coordinator = SimpleNamespace(
+        async_request_refresh=AsyncMock(), async_set_node_favorite=Mock()
+    )
     server_entry = SimpleNamespace(
         entry_id="entry-1",
         data={"url": "http://mesh.invalid"},
@@ -767,23 +769,44 @@ async def test_unfavorite_refreshes_source_and_reloads_favorites_policy() -> Non
         "Source",
         "meshtastic",
     )
-    server_entry.runtime_data = SimpleNamespace(sources={"source-1": source})
+    server_entry.runtime_data = SimpleNamespace(
+        fingerprint="fingerprint", sources={"source-1": source}
+    )
     hass = Mock()
     hass.config_entries.async_loaded_entries.return_value = [server_entry]
     hass.config_entries.async_reload = AsyncMock(return_value=True)
     connection = Mock()
 
-    await _raw_favorite_handler()(
-        hass,
-        connection,
-        {"id": 8, "source_id": "source-1", "node_id": "remote", "favorite": False},
-    )
+    with patch(
+        "custom_components.meshmonitor.entity_policy.async_reconcile_node_registries"
+    ) as reconcile, patch(
+        "custom_components.meshmonitor.entity.async_wait_node_entity_removals",
+        new=AsyncMock(),
+    ) as wait_for_removal:
+        await _raw_favorite_handler()(
+            hass,
+            connection,
+            {
+                "id": 8,
+                "source_id": "source-1",
+                "node_id": "remote",
+                "favorite": False,
+            },
+        )
 
     client.set_meshtastic_favorite.assert_awaited_once_with(
         "source-1", "remote", False
     )
     coordinator.async_request_refresh.assert_awaited_once_with()
-    hass.config_entries.async_reload.assert_awaited_once_with("entry-1")
+    coordinator.async_set_node_favorite.assert_called_once_with("remote", False)
+    reconcile.assert_called_once_with(hass, server_entry, source_ids={"source-1"})
+    wait_for_removal.assert_awaited_once_with(
+        hass,
+        "fingerprint",
+        "source-1",
+        "remote",
+    )
+    hass.config_entries.async_reload.assert_not_awaited()
     connection.send_result.assert_called_once_with(8, {"favorite": False})
 
 

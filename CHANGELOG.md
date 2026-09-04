@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Prevent duplicate Home Assistant device-tracker discovery when a node's
+  coordinates temporarily disappear and later return.
+- Reconcile Home Assistant node devices against successful MeshMonitor source
+  snapshots so explicitly deleted nodes disappear in place, and update favorite
+  membership without reloading the full integration or panel.
 - Honor MeshMonitor's persisted Hide from Map preference in map markers,
   topology and neighbor overlays, fit bounds, and positioned-node counts while
   keeping the node available in Nodes and Home Assistant entities.

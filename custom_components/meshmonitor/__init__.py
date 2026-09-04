@@ -285,6 +285,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeshMonitorConfigEntry) 
     else:
         entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     for source in sources.values():
+        def reconcile_source_registry(source_id: str = source.source_id) -> None:
+            async_reconcile_node_registries(hass, entry, source_ids={source_id})
+
+        entry.async_on_unload(
+            source.coordinator.async_add_listener(reconcile_source_registry)
+        )
         entry.async_on_unload(
             source_connection_registry.register(
                 f"{entry.entry_id}:{source.source_id}",
