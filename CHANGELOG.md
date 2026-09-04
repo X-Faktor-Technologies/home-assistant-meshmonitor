@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+- Keep the Messages composer stable during background refreshes, open selected
+  and sent conversations at the latest message, provide an accessible jump to
+  the latest message, use a compact mobile layout, size message bubbles to their
+  content, and report MeshMonitor send acceptance or rejection honestly.
 - Prevent duplicate Home Assistant device-tracker discovery when a node's
   coordinates temporarily disappear and later return.
+- Keep received and sent MeshCore direct messages in one conversation when
+  MeshMonitor stores the received sender as an unambiguous public-key prefix.
 - Reconcile Home Assistant node devices against successful MeshMonitor source
   snapshots so explicitly deleted nodes disappear in place, and update favorite
   membership without reloading the full integration or panel.

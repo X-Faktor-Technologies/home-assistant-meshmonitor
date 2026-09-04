@@ -38,24 +38,31 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260829-0853";
+} from "./map-view.js?v=20260902-0003";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
 } from "./source-view.js?v=20260822-1242";
 import { serverCardPresentation } from "./server-view.js?v=20260820-1810";
 import {
+  completeMessagesRefresh,
   conversationSourceChoices,
   conversationUnreadCounts,
   messageDraftValidation,
   messageConversationCatalog,
   messageConversationKey,
   messagePresentation,
+  pendingMessagePresentation,
   messageSendNonce,
   messageTimestampMs,
+  messageTimelineAtBottom,
+  messageTimelineRestorePosition,
+  shouldFlushDeferredMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
-} from "./message-view.js?v=20260823-1752";
+  wireMessageInteractionGuard,
+  wireMessageTimelineControl,
+} from "./message-view.js?v=20260902-0003";
 import {
   PANEL_TABS,
   adjacentPanelTab,
@@ -155,6 +162,10 @@ class MeshMonitorPanel extends HTMLElement {
       this._messageScrollByConversation = new Map();
       this._conversationRailScroll = 0;
       this._messageScrollRestoreGeneration = 0;
+      this._forceMessageScrollToBottom = false;
+      this._deferredMessagesRender = false;
+      this._messagePointerActive = false;
+      this._messageFocusTarget = "";
       this._messageDrafts = new Map();
       this._composeSource = "";
       this._composeText = "";
@@ -164,6 +175,7 @@ class MeshMonitorPanel extends HTMLElement {
       this._pendingMessages = [];
       this._notificationSettings = null;
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
       this._notificationSaving = false;
       this._notificationError = "";
       this._advertReview = null;
@@ -245,11 +257,11 @@ class MeshMonitorPanel extends HTMLElement {
   _startTimers() {
     if (!this.isConnected) return;
     if (!this._timer)
-      this._timer = window.setInterval(() => this._load(), 30000);
+      this._timer = window.setInterval(() => this._load({ background: true }), 30000);
     if (!this._relativeTimeTimer)
       this._relativeTimeTimer = window.setInterval(() => {
         this._refreshNodeTimes();
-        if (this._tab === "overview") this._render();
+        if (this._tab === "overview") this._completeBackgroundRender();
       }, 15000);
   }
 
@@ -267,7 +279,7 @@ class MeshMonitorPanel extends HTMLElement {
     this._destroyMap();
   }
 
-  async _load() {
+  async _load({ background = false } = {}) {
     if (!this._hass || this._loading) return;
     const refreshMapInPlace = this._tab === "map" && Boolean(this._mapInstance);
     this._loading = true;
@@ -284,8 +296,19 @@ class MeshMonitorPanel extends HTMLElement {
     } finally {
       this._loading = false;
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
+      else if (background) this._completeBackgroundRender();
       else this._render();
     }
+  }
+
+  _completeBackgroundRender() {
+    completeMessagesRefresh({
+      background: true,
+      activeElement: this.shadowRoot?.activeElement,
+      messagePointerActive: this._messagePointerActive,
+      onDefer: () => { this._deferredMessagesRender = true; },
+      onRender: () => this._render(),
+    });
   }
 
   _allNodes() {
@@ -328,11 +351,14 @@ class MeshMonitorPanel extends HTMLElement {
       const key = timeline.dataset.conversation || "all";
       this._messageScrollByConversation.set(key, {
         atBottom:
-          timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop <
-          48,
+          messageTimelineAtBottom(timeline),
         top: timeline.scrollTop,
       });
     }
+    const active = this.shadowRoot?.activeElement;
+    this._messageFocusTarget = active?.id === "scroll-to-latest"
+      ? "latest"
+      : active?.classList?.contains("messages") ? "timeline" : "";
     const rail = this.shadowRoot?.querySelector(".conversation-rail");
     if (rail)
       this._conversationRailScroll = {
@@ -350,9 +376,22 @@ class MeshMonitorPanel extends HTMLElement {
         const saved = this._messageScrollByConversation.get(
           timeline.dataset.conversation || "all",
         );
-        timeline.scrollTop = saved?.atBottom
+        const restorePosition = messageTimelineRestorePosition({
+          forceToBottom: this._forceMessageScrollToBottom,
+          saved,
+        });
+        timeline.scrollTop = restorePosition === "bottom"
           ? timeline.scrollHeight
-          : saved?.top ?? timeline.scrollHeight;
+          : restorePosition;
+        this._forceMessageScrollToBottom = false;
+        this._updateScrollToLatest(timeline);
+        if (this._messageFocusTarget === "latest") {
+          const latest = this.shadowRoot?.querySelector("#scroll-to-latest");
+          (latest?.hidden ? timeline : latest)?.focus({preventScroll: true});
+        } else if (this._messageFocusTarget === "timeline") {
+          timeline.focus({preventScroll: true});
+        }
+        this._messageFocusTarget = "";
       }
       const rail = this.shadowRoot?.querySelector(".conversation-rail");
       if (rail && this._conversationRailScroll) {
@@ -364,6 +403,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot) return;
+    this._deferredMessagesRender = false;
     this._rememberConversationView();
     this._rememberMapView();
     this._destroyMap();
@@ -733,21 +773,22 @@ class MeshMonitorPanel extends HTMLElement {
         .notification-error { margin:0; padding:9px 11px; border-radius:8px; color:var(--error-color,#db4437); background:color-mix(in srgb,var(--error-color,#db4437) 10%,transparent); font-size:12px; }
         .notification-dialog-actions { display:flex; justify-content:flex-end; gap:9px; padding:11px 21px 17px; }
         .notification-dialog-actions .primary { color:var(--text-primary-color); background:var(--primary-color); }
-        .messages { min-width:0; min-height:0; overflow-y:scroll; overflow-x:hidden; display:flex; flex-direction:column; gap:10px; padding:18px clamp(16px,3vw,34px) 28px; scrollbar-color:color-mix(in srgb,var(--secondary-text-color) 78%,transparent) color-mix(in srgb,var(--secondary-background-color) 72%,transparent); scrollbar-width:auto; scrollbar-gutter:stable; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:auto; }
+        .timeline-wrapper { grid-row:2; position:relative; min-width:0; min-height:0; }
+        .messages { min-width:0; min-height:0; height:100%; overflow-y:scroll; overflow-x:hidden; display:flex; flex-direction:column; gap:10px; padding:18px clamp(16px,3vw,34px) 28px; scrollbar-color:color-mix(in srgb,var(--secondary-text-color) 78%,transparent) color-mix(in srgb,var(--secondary-background-color) 72%,transparent); scrollbar-width:auto; scrollbar-gutter:stable; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:auto; }
         .messages::-webkit-scrollbar,.conversation-rail::-webkit-scrollbar { width:12px; height:12px; }
         .messages::-webkit-scrollbar-track,.conversation-rail::-webkit-scrollbar-track { background:color-mix(in srgb,var(--secondary-background-color) 72%,transparent); }
         .messages::-webkit-scrollbar-thumb,.conversation-rail::-webkit-scrollbar-thumb { min-height:44px; border:3px solid transparent; border-radius:999px; background:color-mix(in srgb,var(--secondary-text-color) 78%,transparent); background-clip:padding-box; }
         .messages:focus-visible { outline:2px solid var(--primary-color); outline-offset:-4px; }
         .day-divider { width:min(100%,1040px); margin:9px auto 3px; display:flex; align-items:center; gap:12px; color:var(--secondary-text-color); font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
         .day-divider::before,.day-divider::after { content:""; height:1px; background:var(--divider-color); flex:1; }
-        .message { width:min(82%,760px); min-width:0; padding:11px 14px 10px; border:0; border-radius:11px; background:var(--secondary-background-color); box-shadow:none; }
+        .message { width:fit-content; max-width:min(82%,760px); min-width:0; padding:11px 14px 10px; border:0; border-radius:11px; background:var(--secondary-background-color); box-shadow:none; }
         .message.notification-target { outline:3px solid color-mix(in srgb,var(--primary-color) 65%,transparent); outline-offset:3px; }
         .message.incoming { align-self:flex-start; border-bottom-left-radius:0; }
         .message.outgoing { align-self:flex-end; border-bottom-right-radius:0; background:color-mix(in srgb,var(--primary-color) 18%,var(--card-background-color)); }
         .message.pending { opacity:.82; }
         .message-send-state { margin-left:auto; display:inline-flex; align-items:center; gap:5px; }
         .message-send-state.sending::before { content:""; width:10px; height:10px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:message-spin .75s linear infinite; }
-        .message-send-state.queued::before { content:"◷"; font-size:13px; }
+        .message-send-state.accepted::before { content:"◷"; font-size:13px; }
         .message-send-state.failed { color:var(--error-color,#db4437); }
         .message-send-state.failed::before { content:"!"; font-weight:800; }
         @keyframes message-spin { to { transform:rotate(360deg); } }
@@ -767,6 +808,8 @@ class MeshMonitorPanel extends HTMLElement {
         .message-reply { margin-left:auto; padding:3px 7px; border:0; border-radius:6px; background:transparent; color:var(--secondary-text-color); font-size:10px; }
         .message-reply:hover { color:var(--primary-text-color); background:color-mix(in srgb,var(--primary-color) 9%,transparent); }
         .messages .panel-state { min-height:100%; border:0; background:transparent; }
+        .scroll-to-latest { position:absolute; right:20px; bottom:16px; z-index:1; border-color:var(--primary-color); background:var(--card-background-color); box-shadow:0 3px 12px #0004; }
+        .scroll-to-latest:focus-visible { outline:3px solid var(--primary-color); outline-offset:3px; }
         .compose { min-width:0; margin:0; border-radius:0; border:0; border-top:1px solid var(--divider-color); padding:9px 13px 10px; background:transparent; box-shadow:none; }
         .compose-top { min-width:0; display:flex; align-items:center; gap:9px; margin-bottom:7px; }
         .compose-top label { min-width:0; display:flex; align-items:center; gap:6px; color:var(--secondary-text-color); font-size:10px; }
@@ -785,6 +828,7 @@ class MeshMonitorPanel extends HTMLElement {
         .compose-count { font-size:10px; }
         .send-status { margin-top:7px; font-size:11px; line-height:1.4; }
         .send-status.ambiguous { color:var(--warning-color,#ffb300); }
+        .send-status:not(.ambiguous) { color:var(--error-color,#db4437); }
         .reply-placeholder { min-width:0; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 16px; border-top:1px solid var(--divider-color); background:var(--card-background-color); color:var(--secondary-text-color); }
         .reply-placeholder strong { display:block; color:var(--primary-text-color); font-size:13px; }
         .reply-placeholder span { display:block; margin-top:2px; font-size:11px; line-height:1.4; }
@@ -821,7 +865,7 @@ class MeshMonitorPanel extends HTMLElement {
           .conversation-actions #mark-read { grid-column:span 2; }
           .conversation-alert { margin:9px 11px 0; }
           .messages { padding:12px 10px 20px 12px; scrollbar-gutter:stable; }
-          .message { width:100%; padding:12px 13px 11px; }
+          .message { width:fit-content; max-width:100%; padding:12px 13px 11px; }
           .message-text { max-width:none; }
           .message-head { align-items:baseline; flex-wrap:nowrap; }
           .reply-placeholder { align-items:flex-start; padding:11px 12px; }
@@ -832,7 +876,8 @@ class MeshMonitorPanel extends HTMLElement {
           .message-identity { align-items:flex-start; flex-direction:column; gap:3px; }
           .reply-state { display:none; }
         }
-        @media(max-width:760px){.conversation-shell{height:max(640px,calc(100dvh - 92px));display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto}.compose-top{align-items:flex-start;flex-direction:column}.compose-top label,.compose-top select{width:100%;max-width:none}.compose-body{grid-template-columns:1fr}.compose-action{display:flex;align-items:center;justify-content:space-between}.send-review-grid{grid-template-columns:1fr}}
+        @media(max-width:760px){.timeline-wrapper{grid-row:1}}
+        @media(max-width:760px){.conversation-shell{height:100%;min-height:0;max-height:none;display:grid;grid-template-rows:auto minmax(0,1fr)}.conversation-rail{display:grid;grid-template-rows:auto auto;overflow:visible;border-bottom:1px solid var(--divider-color);background:var(--primary-background-color)}.conversation-search{position:static;width:auto;min-width:0;padding:9px 10px 6px;border:0}.conversation-picker{display:block}.conversation-picker-wrap{display:block;padding:0 10px 9px}.conversation-rail>.conversation-item,.conversation-rail>.rail-heading{display:none}.conversation-pane{height:auto;min-height:0;grid-template-rows:minmax(0,1fr) auto}.conversation-chrome{display:none}.messages{min-height:0;overflow-y:scroll}.compose{position:relative;bottom:auto;padding:7px 10px max(7px,env(safe-area-inset-bottom))}.compose-top{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;margin-bottom:5px}.compose-top label{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:6px;width:100%}.compose-top select{width:100%;max-width:none;min-height:36px}.compose-route{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compose-body{grid-template-columns:1fr;gap:6px}.compose textarea{min-height:44px;max-height:96px;padding:7px 9px}.compose-action{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,1fr);align-items:center;justify-items:stretch}.compose-action #compose-send{width:100%;min-height:44px}.compose-count{text-align:left}.compose-note{display:none}.send-review-grid{grid-template-columns:1fr}}
         @media(prefers-reduced-motion:reduce){.leaflet-fade-anim .leaflet-popup,.leaflet-zoom-anim .leaflet-zoom-animated{transition:none!important}}
       </style>
       ${this._error ? `<div class="error">${escapeHtml(this._error)}</div>` : ""}
@@ -846,6 +891,8 @@ class MeshMonitorPanel extends HTMLElement {
       ${this._advertDialog()}
       ${this._notificationDialog()}`;
     this._restoreConversationView();
+    this._wireMessageTimeline();
+    this._wireMessageInteractionGuards();
     this._restoreNotificationDeepLink();
     this.shadowRoot.querySelector("#sidebar-toggle")?.addEventListener("click", () =>
       this.dispatchEvent(new CustomEvent("hass-toggle-menu", {
@@ -1085,21 +1132,27 @@ class MeshMonitorPanel extends HTMLElement {
     this.shadowRoot.querySelector("#conversation-mute")?.addEventListener("click", () =>
       this._toggleConversationPreference("muted", this._conversation),
     );
-    this.shadowRoot.querySelector("#notification-bell")?.addEventListener("click", async () => {
-      this._notificationDialogOpen = true;
-      this._notificationError = "";
-      this._render();
-      await this._loadNotificationSettings();
-      this._render();
-    });
+    this.shadowRoot.querySelector("#notification-bell")?.addEventListener(
+      "click",
+      () => this._openNotificationDialog(),
+    );
     this.shadowRoot.querySelector("#close-notification-dialog")?.addEventListener("click", () => {
-      this._notificationDialogOpen = false;
-      this._render();
+      this._closeNotificationDialog();
     });
     this.shadowRoot.querySelector("#cancel-notification-settings")?.addEventListener("click", () => {
-      this._notificationDialogOpen = false;
-      this._render();
+      this._closeNotificationDialog();
     });
+    for (const [id, field, kind] of [
+      ["notification-enabled", "enabled", "checked"],
+      ["notification-target", "target", "value"],
+      ["notification-scope", "scope", "value"],
+      ["notification-preview", "include_preview", "checked"],
+    ]) {
+      this.shadowRoot.querySelector(`#${id}`)?.addEventListener("change", (event) => {
+        if (this._notificationDraft)
+          this._notificationDraft[field] = event.target[kind];
+      });
+    }
     this.shadowRoot.querySelector("#save-notification-settings")?.addEventListener("click", () =>
       this._saveNotificationSettings(),
     );
@@ -2434,9 +2487,63 @@ class MeshMonitorPanel extends HTMLElement {
     this._composeSource = "";
     this._sendStatus = "";
     this._sendReview = null;
+    this._forceMessageScrollToBottom = true;
     if (!keepReplyContext) this._replyContext = null;
     localStorage.setItem("meshmonitor.messages.conversation", key);
     this._render();
+  }
+
+  _updateScrollToLatest(timeline) {
+    const button = this.shadowRoot?.querySelector("#scroll-to-latest");
+    if (!button || !timeline) return;
+    button.hidden = messageTimelineAtBottom(timeline);
+  }
+
+  _wireMessageTimeline() {
+    const timeline = this.shadowRoot?.querySelector(".messages");
+    if (!timeline) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "timeline-wrapper";
+    const button = document.createElement("button");
+    button.id = "scroll-to-latest";
+    button.className = "scroll-to-latest";
+    button.type = "button";
+    button.textContent = "Scroll to latest";
+    button.hidden = true;
+    wireMessageTimelineControl(timeline, button);
+    timeline.replaceWith(wrapper);
+    wrapper.append(timeline, button);
+  }
+
+  _flushDeferredMessagesRender() {
+    if (!shouldFlushDeferredMessagesRender({
+      deferred: this._deferredMessagesRender,
+      messagePointerActive: this._messagePointerActive,
+      composerEngaged: this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+      messagesEngaged:
+        this.shadowRoot?.activeElement?.closest?.(
+          ".messages-view, #notification-bell, .notification-dialog",
+        ) != null,
+    })) return;
+    this._render();
+  }
+
+  _wireMessageInteractionGuards() {
+    const targets = [
+      this.shadowRoot?.querySelector(".messages-view"),
+      this.shadowRoot?.querySelector("#notification-bell"),
+      this.shadowRoot?.querySelector(".notification-dialog"),
+    ].filter(Boolean);
+    for (const target of targets) {
+      wireMessageInteractionGuard(target, (active) => {
+        this._messagePointerActive = active;
+        if (!active) this._flushDeferredMessagesRender();
+      });
+      target.addEventListener("focusout", () => window.setTimeout(
+        () => this._flushDeferredMessagesRender(),
+        0,
+      ));
+    }
   }
 
   _restoreNotificationDeepLink() {
@@ -2515,11 +2622,33 @@ class MeshMonitorPanel extends HTMLElement {
     }
   }
 
+  _openNotificationDialog() {
+    this._notificationDialogOpen = true;
+    this._notificationError = "";
+    this._notificationDraft = {
+      ...(this._notificationSettings || {
+        enabled: false,
+        target: "",
+        scope: "all",
+        include_preview: false,
+        targets: [],
+      }),
+    };
+    this._render();
+  }
+
+  _closeNotificationDialog() {
+    this._notificationDialogOpen = false;
+    this._notificationDraft = null;
+    this._render();
+  }
+
   async _saveNotificationSettings() {
-    const enabled = Boolean(this.shadowRoot.querySelector("#notification-enabled")?.checked);
-    const target = this.shadowRoot.querySelector("#notification-target")?.value || "";
-    const scope = this.shadowRoot.querySelector("#notification-scope")?.value || "all";
-    const includePreview = Boolean(this.shadowRoot.querySelector("#notification-preview")?.checked);
+    const draft = this._notificationDraft || {};
+    const enabled = Boolean(draft.enabled);
+    const target = String(draft.target || "");
+    const scope = String(draft.scope || "all");
+    const includePreview = Boolean(draft.include_preview);
     if (enabled && !target) {
       this._notificationError = "Choose a Home Assistant notification target before enabling alerts.";
       this._render();
@@ -2537,6 +2666,7 @@ class MeshMonitorPanel extends HTMLElement {
         include_preview: includePreview,
       });
       this._notificationDialogOpen = false;
+      this._notificationDraft = null;
     } catch (error) {
       this._notificationError = error?.message || "Notification settings could not be saved.";
     } finally {
@@ -2558,7 +2688,7 @@ class MeshMonitorPanel extends HTMLElement {
 
   _notificationDialog() {
     if (!this._notificationDialogOpen) return "";
-    const settings = this._notificationSettings || {
+    const settings = this._notificationDraft || this._notificationSettings || {
       enabled: false, target: "", scope: "all", include_preview: false, targets: [],
     };
     const targets = Array.isArray(settings.targets) ? settings.targets : [];
@@ -2628,7 +2758,7 @@ class MeshMonitorPanel extends HTMLElement {
     ));
     const selected = catalog.find((item) => item.key === this._conversation);
     this._pendingMessages = this._pendingMessages.filter((pending) => {
-      if (pending.state !== "queued") return true;
+      if (pending.state !== "accepted") return true;
       return !messages.some((message) =>
         messagePresentation(message, this._lastRead, this._data?.sources || []).outgoing === true &&
         this._conversationKey(message) === pending.conversationKey &&
@@ -2658,8 +2788,8 @@ class MeshMonitorPanel extends HTMLElement {
       .filter((pending) => pending.conversationKey === this._conversation)
       .map((pending) => {
         const time = new Date(pending.createdAt).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-        const stateLabel = pending.state === "sending" ? "Sending" : pending.state === "queued" ? "Queued" : "Not sent";
-        return `<article class="message outgoing pending" role="listitem"><div class="message-head"><span class="message-sender">You</span><time class="message-time">${escapeHtml(time)}</time></div><div class="message-text">${escapeHtml(pending.body)}</div><div class="message-meta"><span>${escapeHtml(pending.sourceName)}</span><span class="message-send-state ${escapeHtml(pending.state)}" title="${pending.state === "queued" ? "Queued once by Home Assistant; radio delivery is not confirmed" : escapeHtml(pending.error || stateLabel)}">${escapeHtml(stateLabel)}</span></div></article>`;
+        const state = pendingMessagePresentation(pending);
+        return `<article class="message outgoing pending" role="listitem"><div class="message-head"><span class="message-sender">You</span><time class="message-time">${escapeHtml(time)}</time></div><div class="message-text">${escapeHtml(pending.body)}</div><div class="message-meta"><span>${escapeHtml(pending.sourceName)}</span><span class="message-send-state ${escapeHtml(pending.state)}" title="${escapeHtml(state.title)}">${escapeHtml(state.label)}</span></div></article>`;
       }).join("");
     const rail = ["channel","direct"].map((type) => `<div class="rail-heading">${type === "channel" ? "Channels" : "Direct messages"}</div>${catalog.filter((item)=>item.type===type).map((item)=>`<button class="conversation-item ${this._conversation===item.key?"active":""}" data-conversation="${escapeHtml(item.key)}" aria-pressed="${this._conversation===item.key}"><span class="conversation-icon">${type==="channel"?"#":"↔"}</span><span class="conversation-label"><strong>${this._pinnedConversations.has(item.key)?"★ ":""}${escapeHtml(item.name)}</strong><small>${escapeHtml(item.detail)}${this._mutedConversations.has(item.key)?" · muted":""}</small></span>${unreadCounts.get(item.key)?`<span class="unread-count" aria-label="${unreadCounts.get(item.key)} unread">${unreadCounts.get(item.key)}</span>`:""}<span class="badge protocol-${escapeHtml(item.protocol)}">${escapeHtml(item.protocol)}</span></button>`).join("")}`).join("");
     const picker = `<div class="conversation-picker-wrap"><select id="conversation-picker" class="conversation-picker" aria-label="Choose channel or conversation"><option value="all" ${this._conversation==="all"?"selected":""}>All messages</option>${catalog.map((item)=>`<option value="${escapeHtml(item.key)}" ${this._conversation===item.key?"selected":""}>${item.type==="channel"?"# ":"↔ "}${escapeHtml(item.name)}${unreadCounts.get(item.key)?` (${unreadCounts.get(item.key)} unread)`:""}</option>`).join("")}</select></div>`;
@@ -2821,7 +2951,7 @@ class MeshMonitorPanel extends HTMLElement {
     const reply = this._replyContext
       ? `<div class="reply-context"><strong>Replying to ${escapeHtml(this._replyContext.sender)}</strong><span>${escapeHtml(this._replyContext.body)}</span><button id="cancel-reply-context" aria-label="Cancel quoted reply context">×</button></div>`
       : "";
-    return `<section class="compose" aria-label="Message composer"><div class="compose-top"><label>Send via <select id="compose-source" aria-label="Exact outbound source">${enabled.map(({source:item}) => `<option value="${escapeHtml(sourceSelectionKey(item))}" ${sourceSelectionKey(item) === this._composeSource ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.source_id)}</option>`).join("")}</select></label><span class="compose-route" title="${escapeHtml(destination)}">${escapeHtml(conversation.protocol)} · ${escapeHtml(destination)}</span></div>${reply}<div class="compose-body"><textarea id="compose-text" aria-label="Message body" placeholder="Write a message. Enter adds a new line; it never sends.">${escapeHtml(this._composeText)}</textarea><div class="compose-action"><span id="compose-count" class="compose-count muted">${validation.bytes} / ${validation.limit} bytes</span><button id="compose-send" ${this._sending || !validation.valid ? "disabled" : ""}>${this._sending ? "Sending…" : "Send"}</button></div></div>${this._sendStatus ? `<div class="send-status ${this._sendStatusAmbiguous ? "ambiguous" : ""}" role="status" aria-live="polite">${escapeHtml(this._sendStatus)}</div>` : ""}<div class="muted" style="margin-top:5px;font-size:9px">A check means the outgoing message appeared in stored MeshMonitor history; it does not prove radio delivery. No automatic retries.</div></section>`;
+    return `<section class="compose" aria-label="Message composer"><div class="compose-top"><label>Send via <select id="compose-source" aria-label="Exact outbound source">${enabled.map(({source:item}) => `<option value="${escapeHtml(sourceSelectionKey(item))}" ${sourceSelectionKey(item) === this._composeSource ? "selected" : ""}>${escapeHtml(item.name)} · ${escapeHtml(item.source_id)}</option>`).join("")}</select></label><span class="compose-route" title="${escapeHtml(destination)}">${escapeHtml(conversation.protocol)} · ${escapeHtml(destination)}</span></div>${reply}<div class="compose-body"><textarea id="compose-text" aria-label="Message body" placeholder="Write a message. Enter adds a new line; it never sends.">${escapeHtml(this._composeText)}</textarea><div class="compose-action"><span id="compose-count" class="compose-count muted">${validation.bytes} / ${validation.limit} bytes</span><button id="compose-send" ${this._sending || !validation.valid ? "disabled" : ""}>${this._sending ? "Sending…" : "Send"}</button></div></div>${this._sendStatus ? `<div class="send-status ${this._sendStatusAmbiguous ? "ambiguous" : ""}" role="status" aria-live="polite">${escapeHtml(this._sendStatus)}</div>` : ""}<div class="compose-note muted">A check means the outgoing message appeared in stored MeshMonitor history; it does not prove radio delivery. No automatic retries.</div></section>`;
   }
 
   async _sendMessage() {
@@ -2858,6 +2988,7 @@ class MeshMonitorPanel extends HTMLElement {
     };
     this._pendingMessages.push(pending);
     this._sending = true;
+    this._forceMessageScrollToBottom = true;
     this._composeText = "";
     this._messageDrafts.delete(this._conversation);
     this._replyContext = null;
@@ -2876,12 +3007,10 @@ class MeshMonitorPanel extends HTMLElement {
       };
       if (conversation.type === "direct") request.destination = conversation.recipient;
       else request.channel = conversation.channel;
-      // HA accepts the reviewed command immediately and owns the single
-      // background transaction, so browser command deadlines cannot cancel a
-      // radio handoff already authorized by the user.
       const result = await this._hass.callWS(request);
       if (result.accepted) {
-        pending.state = "queued";
+        pending.state = "accepted";
+        pending.deliveryState = result.delivery_state || "accepted";
         this._render();
         try {
           await this._load();
@@ -2917,7 +3046,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260829-0853")) {
-  customElements.define("meshmonitor-panel-20260829-0853", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260902-0003")) {
+  customElements.define("meshmonitor-panel-20260902-0003", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";

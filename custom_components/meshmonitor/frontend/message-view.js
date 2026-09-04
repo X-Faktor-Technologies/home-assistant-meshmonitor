@@ -194,6 +194,23 @@ export const sendErrorPresentation = (error) => {
   };
 };
 
+export const pendingMessagePresentation = (pending) => {
+  if (pending.state === "sending")
+    return { label: "Sending", title: "Submitting once to MeshMonitor" };
+  if (pending.state === "accepted") {
+    const deliveryState = String(pending.deliveryState || "accepted").toLowerCase();
+    return {
+      label: "Accepted by MeshMonitor",
+      title:
+        `MeshMonitor reported ${deliveryState}; stored history and radio delivery are not confirmed`,
+    };
+  }
+  return {
+    label: "Not sent",
+    title: pending.error || "The send was not accepted",
+  };
+};
+
 export const messagesInConversation = (messages, conversation) =>
   conversation === "all"
     ? [...messages]
@@ -226,6 +243,92 @@ export const sortMessagesChronologically = (messages) =>
     const time = messageTimestampMs(left) - messageTimestampMs(right);
     return time || String(left.id || "").localeCompare(String(right.id || ""));
   });
+
+export const shouldDeferMessagesRender = ({
+  background = false,
+  composerEngagedAtCompletion = false,
+  messagesEngagedAtCompletion = false,
+  messagePointerActive = false,
+} = {}) =>
+  background && (
+    composerEngagedAtCompletion ||
+    messagesEngagedAtCompletion ||
+    messagePointerActive
+  );
+
+export const completeMessagesRefresh = ({
+  background = false,
+  activeElement = null,
+  messagePointerActive = false,
+  onDefer,
+  onRender,
+} = {}) => {
+  const deferred = shouldDeferMessagesRender({
+    background,
+    messagesEngagedAtCompletion:
+      activeElement?.closest?.(
+        ".messages-view, #notification-bell, .notification-dialog",
+      ) != null,
+    messagePointerActive,
+  });
+  if (deferred) onDefer?.();
+  else onRender?.();
+  return deferred ? "deferred" : "rendered";
+};
+
+export const wireMessageInteractionGuard = (
+  target,
+  onActiveChange,
+  schedule = (callback) => window.setTimeout(callback, 0),
+  releaseTarget = target.ownerDocument,
+) => {
+  target.addEventListener("pointerdown", () => {
+    onActiveChange(true);
+    const release = () => {
+      releaseTarget.removeEventListener("pointerup", release, true);
+      releaseTarget.removeEventListener("pointercancel", release, true);
+      schedule(() => onActiveChange(false));
+    };
+    releaseTarget.addEventListener("pointerup", release, true);
+    releaseTarget.addEventListener("pointercancel", release, true);
+  });
+};
+
+export const shouldFlushDeferredMessagesRender = ({
+  deferred = false,
+  messagePointerActive = false,
+  composerEngaged = false,
+  messagesEngaged = false,
+} = {}) =>
+  deferred &&
+  !messagePointerActive &&
+  !composerEngaged &&
+  !messagesEngaged;
+
+export const messageTimelineAtBottom = (
+  { scrollHeight, clientHeight, scrollTop },
+  threshold = 48,
+) => scrollHeight - clientHeight - scrollTop < threshold;
+
+export const wireMessageTimelineControl = (timeline, button) => {
+  const update = () => {
+    button.hidden = messageTimelineAtBottom(timeline);
+  };
+  button.addEventListener("click", () => {
+    timeline.scrollTop = timeline.scrollHeight;
+    update();
+    timeline.focus?.({ preventScroll: true });
+  });
+  timeline.addEventListener("scroll", update);
+  update();
+  return update;
+};
+
+export const messageTimelineRestorePosition = ({
+  forceToBottom = false,
+  saved,
+} = {}) =>
+  forceToBottom || saved?.atBottom ? "bottom" : saved?.top ?? "bottom";
 
 const normalizedPeerId = (value) => String(value || "").toLowerCase();
 

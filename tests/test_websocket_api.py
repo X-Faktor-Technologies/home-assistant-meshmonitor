@@ -21,6 +21,7 @@ from custom_components.meshmonitor.const import (
     CONF_SERVER_OPTIONS,
     CONF_SOURCE_OPTIONS,
     CONF_SOURCE_TYPE,
+    DOMAIN,
     NODE_DEVICE_POLICY_FAVORITES,
 )
 from custom_components.meshmonitor.server_health_coordinator import (
@@ -44,7 +45,11 @@ from custom_components.meshmonitor.vendor_meshmonitor_client import (
     VersionCheck,
 )
 from custom_components.meshmonitor.vendor_meshmonitor_client.client import (
+    MeshMonitorClient,
     _validate_message_text,
+)
+from custom_components.meshmonitor.vendor_meshmonitor_client.exceptions import (
+    MeshMonitorResponseError,
 )
 from custom_components.meshmonitor.websocket_api import (
     _loaded_source_entry,
@@ -692,17 +697,13 @@ async def test_saved_node_removal_option_cannot_reenable_unavailable_route() -> 
     assert not entry.runtime_data.client.mock_calls
 
 
-async def _run_scheduled_sends(hass: Mock) -> None:
-    """Run background coroutines captured by the HA task mock."""
-    for call in hass.async_create_task.call_args_list:
-        await call.args[0]
-
-
 @pytest.mark.asyncio
 async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
     peer_hash = "0123456789abcdef0123456789abcdef"
     client = SimpleNamespace(
-        send_reticulum_message=AsyncMock(return_value=SimpleNamespace(state="sending"))
+        send_reticulum_message=AsyncMock(
+            return_value=SimpleNamespace(id="lxmf-message", state="sending")
+        )
     )
     entry = SimpleNamespace(
         entry_id="entry-rns",
@@ -711,9 +712,22 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
         runtime_data=SimpleNamespace(client=client),
     )
     hass = Mock()
-    hass.data = {}
-    hass.async_create_task = Mock()
     connection = Mock()
+    coordinator = SimpleNamespace(async_request_refresh=AsyncMock())
+    hass.data = {
+        DOMAIN: {
+            "message_coordinators": {
+                "entry-rns": {"coordinator": coordinator},
+            }
+        }
+    }
+    scheduled = []
+
+    def schedule_after_result(coro: object, _name: str) -> None:
+        assert connection.send_result.called
+        scheduled.append(coro)
+
+    hass.async_create_task = Mock(side_effect=schedule_after_result)
     message = {
         "id": 88,
         "entry_id": "entry-rns",
@@ -733,14 +747,335 @@ async def test_reticulum_panel_send_uses_supported_lxmf_route() -> None:
         patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
     ):
         await _raw_send_handler()(hass, connection, message)
-        await _run_scheduled_sends(hass)
 
     client.send_reticulum_message.assert_awaited_once_with(
         "source-rns", "Hello over LXMF", to_destination_hash=peer_hash
     )
     connection.send_result.assert_called_once_with(
         88,
-        {"accepted": True, "message_id": None, "delivery_state": "ha_queued"},
+        {"accepted": True, "message_id": "lxmf-message", "delivery_state": "sending"},
+    )
+    hass.async_create_task.assert_called_once()
+    assert len(scheduled) == 1
+    scheduled[0].close()
+
+
+@pytest.mark.asyncio
+async def test_reticulum_client_rejects_unsuccessful_2xx_receipt() -> None:
+    client = MeshMonitorClient("http://mesh.invalid", "token")
+    with patch.object(
+        client,
+        "_post_json",
+        AsyncMock(return_value={"success": False, "data": {"id": "rejected"}}),
+    ):
+        with pytest.raises(
+            MeshMonitorResponseError,
+            match="did not accept the Reticulum message",
+        ):
+            await client.send_reticulum_message(
+                "source-rns",
+                "Hello over LXMF",
+                to_destination_hash="a" * 32,
+            )
+
+
+@pytest.mark.asyncio
+async def test_panel_send_reports_meshmonitor_rejection_instead_of_queued() -> None:
+    client = SimpleNamespace(
+        send_meshcore_message=AsyncMock(side_effect=MeshMonitorResponseError("rejected"))
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-meshcore",
+        data={CONF_SOURCE_TYPE: "meshcore"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 89,
+        "entry_id": "entry-meshcore",
+        "source_id": "source-meshcore",
+        "protocol": "meshcore",
+        "text": "Hello",
+        "nonce": "1123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "a" * 64,
+    }
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        89, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = SimpleNamespace(
+        send_meshcore_message=AsyncMock(
+            return_value=SimpleNamespace(
+                success=False,
+                message_id=None,
+                delivery_state=None,
+            )
+        )
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-meshcore",
+        data={CONF_SOURCE_TYPE: "meshcore"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 90,
+        "entry_id": "entry-meshcore",
+        "source_id": "source-meshcore",
+        "protocol": "meshcore",
+        "text": "Hello",
+        "nonce": "2123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "a" * 64,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        90, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_meshtastic_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = SimpleNamespace(
+        send_meshtastic_message=AsyncMock(
+            return_value=SimpleNamespace(
+                success=False,
+                message_id=None,
+                delivery_state=None,
+            )
+        )
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-meshtastic",
+        data={CONF_SOURCE_TYPE: "meshtastic"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 92,
+        "entry_id": "entry-meshtastic",
+        "source_id": "source-meshtastic",
+        "protocol": "meshtastic",
+        "text": "Hello",
+        "nonce": "4123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "channel": 0,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    client.send_meshtastic_message.assert_awaited_once_with(
+        "source-meshtastic", "Hello", channel=0, to_node_id=None
+    )
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        92, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reticulum_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = MeshMonitorClient("http://mesh.invalid", "token")
+    entry = SimpleNamespace(
+        entry_id="entry-rns",
+        data={CONF_SOURCE_TYPE: "reticulum"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 93,
+        "entry_id": "entry-rns",
+        "source_id": "source-rns",
+        "protocol": "reticulum",
+        "text": "Hello over LXMF",
+        "nonce": "5123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "a" * 32,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+        patch.object(
+            client,
+            "_post_json",
+            AsyncMock(return_value={"success": False, "data": {"id": "rejected"}}),
+        ),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        93, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_panel_send_validates_before_reserving_transmit_guard() -> None:
+    client = SimpleNamespace(send_meshcore_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-meshcore",
+        data={CONF_SOURCE_TYPE: "meshcore"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 91,
+        "entry_id": "entry-meshcore",
+        "source_id": "source-meshcore",
+        "protocol": "meshcore",
+        "text": "Hello",
+        "nonce": "3123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "not-a-public-key",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_meshcore_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        91, "invalid_format", "Message or destination failed validation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_meshtastic_panel_send_validates_before_reserving_guard() -> None:
+    client = SimpleNamespace(send_meshtastic_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-meshtastic",
+        data={CONF_SOURCE_TYPE: "meshtastic"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 94,
+        "entry_id": "entry-meshtastic",
+        "source_id": "source-meshtastic",
+        "protocol": "meshtastic",
+        "text": "Hello",
+        "nonce": "6123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "bad-node",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_meshtastic_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        94, "invalid_format", "Message or destination failed validation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_reticulum_panel_send_validates_before_reserving_guard() -> None:
+    client = SimpleNamespace(send_reticulum_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-rns",
+        data={CONF_SOURCE_TYPE: "reticulum"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 95,
+        "entry_id": "entry-rns",
+        "source_id": "source-rns",
+        "protocol": "reticulum",
+        "text": "Hello over LXMF",
+        "nonce": "7123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "not-a-destination-hash",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_reticulum_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        95, "invalid_format", "Message or destination failed validation"
     )
 
 

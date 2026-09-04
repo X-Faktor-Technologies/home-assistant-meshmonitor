@@ -364,19 +364,47 @@ def _enrich_messages(messages: list[UnifiedMessage], source: MessageSource) -> l
         for channel in (getattr(snapshot, "channels", ()) if snapshot is not None else ())
         if channel.index is not None and (channel.display_name or channel.name)
     }
+    snapshot_nodes = tuple(
+        getattr(snapshot, "nodes", ()) if snapshot is not None else ()
+    )
     nodes = {
         _normalize_id(node.id): node.long_name or node.short_name
-        for node in (getattr(snapshot, "nodes", ()) if snapshot is not None else ())
+        for node in snapshot_nodes
         if node.long_name or node.short_name
     }
-    return [
-        replace(
-            message,
-            channel_name=message.channel_name or channels.get(message.channel),
-            from_name=message.from_name or nodes.get(_normalize_id(message.from_id)),
+    node_ids = tuple(node.id for node in snapshot_nodes)
+    enriched = []
+    for message in messages:
+        from_id = _canonical_message_node_id(
+            message.from_id, source.source_type, node_ids
         )
-        for message in messages
+        enriched.append(
+            replace(
+                message,
+                from_id=from_id,
+                to_id=_canonical_message_node_id(
+                    message.to_id, source.source_type, node_ids
+                ),
+                channel_name=message.channel_name or channels.get(message.channel),
+                from_name=message.from_name or nodes.get(_normalize_id(from_id)),
+            )
+        )
+    return enriched
+
+
+def _canonical_message_node_id(
+    value: str | None, source_type: str, node_ids: tuple[str, ...]
+) -> str | None:
+    """Expand an unambiguous MeshCore message key prefix to its contact key."""
+    if value is None or source_type != SOURCE_TYPE_MESHCORE:
+        return value
+    normalized = _normalize_id(value)
+    if not normalized or normalized.startswith("channel-"):
+        return value
+    matches = [
+        node_id for node_id in node_ids if _normalize_id(node_id).startswith(normalized)
     ]
+    return matches[0] if len(matches) == 1 else value
 
 
 def _merge_messages(messages: list[UnifiedMessage]) -> tuple[UnifiedMessage, ...]:

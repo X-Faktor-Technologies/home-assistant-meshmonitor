@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping
 from time import time
 from typing import TYPE_CHECKING, Any
@@ -75,6 +76,43 @@ if TYPE_CHECKING:
     from . import MeshMonitorConfigEntry, MeshMonitorSourceRuntime
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _validate_panel_message(source_type: str, msg: Mapping[str, Any]) -> None:
+    """Validate the reviewed message before consuming replay/rate-limit state."""
+    text = msg["text"]
+    if not text.strip():
+        raise ValueError("message text must not be empty")
+    try:
+        byte_count = len(text.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("message text must contain valid UTF-8") from exc
+
+    channel = msg.get("channel")
+    destination = msg.get("destination")
+    if source_type == SOURCE_TYPE_RETICULUM:
+        if channel is not None or not re.fullmatch(r"[0-9a-fA-F]{32}", destination or ""):
+            raise ValueError("Reticulum requires a 32-digit destination hash")
+        limit = 4096
+    elif source_type == SOURCE_TYPE_MESHCORE:
+        if channel is not None:
+            if not 0 <= channel <= 255:
+                raise ValueError("MeshCore channel must be between 0 and 255")
+            limit = 130
+        else:
+            if not re.fullmatch(r"[0-9a-fA-F]{64}", destination or ""):
+                raise ValueError("MeshCore destination must contain 64 hexadecimal digits")
+            limit = 150
+    else:
+        if channel is not None:
+            if not 0 <= channel <= 7:
+                raise ValueError("Meshtastic channel must be between 0 and 7")
+        elif not re.fullmatch(r"![0-9a-fA-F]{8}", destination or ""):
+            raise ValueError("Meshtastic destination must be ! plus 8 hexadecimal digits")
+        limit = 200
+
+    if byte_count > limit:
+        raise ValueError(f"message text must not exceed {limit} UTF-8 bytes")
 
 
 def _serialize_node(
@@ -1026,6 +1064,14 @@ async def websocket_send_message(
         return
 
     try:
+        _validate_panel_message(source_type, msg)
+    except ValueError:
+        connection.send_error(
+            msg["id"], "invalid_format", "Message or destination failed validation"
+        )
+        return
+
+    try:
         # Browser controls are a usability layer, not an authorization boundary;
         # panel and automation sends therefore share one backend guard.
         reserve_message_send(hass, f"panel:{msg['nonce']}")
@@ -1033,57 +1079,81 @@ async def websocket_send_message(
         connection.send_error(msg["id"], exc.code, exc.message)
         return
 
-    async def perform_send() -> None:
-        """Finish the one reviewed send independently of the browser socket."""
-        client = entry.runtime_data.client
-        try:
-            if source_type == SOURCE_TYPE_RETICULUM:
-                reticulum_result = await client.send_reticulum_message(
-                    msg["source_id"],
-                    msg["text"],
-                    to_destination_hash=msg.get("destination", ""),
-                )
-                delivery_state = reticulum_result.state
-            elif source_type == SOURCE_TYPE_MESHCORE:
-                meshcore_result = await client.send_meshcore_message(
-                    msg["source_id"],
-                    msg["text"],
-                    channel=msg.get("channel"),
-                    to_public_key=msg.get("destination"),
-                )
-                delivery_state = meshcore_result.delivery_state
-            else:
-                meshtastic_result = await client.send_meshtastic_message(
-                    msg["source_id"],
-                    msg["text"],
-                    channel=msg.get("channel"),
-                    to_node_id=msg.get("destination"),
-                )
-                delivery_state = meshtastic_result.delivery_state
-        except Exception as exc:  # Result is retained without automatic retry.
-            _LOGGER.error("Background MeshMonitor send failed: %s", type(exc).__name__)
-            return
-        _LOGGER.info(
-            "Background MeshMonitor send accepted for source %s (%s)",
-            msg["source_id"],
-            delivery_state or "accepted",
-        )
-        message_runtime = (
-            hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
-        )
-        if message_runtime:
-            await message_runtime["coordinator"].async_request_refresh()
-
+    client = entry.runtime_data.client
+    message_id: str | None
     try:
-        hass.async_create_task(perform_send(), "MeshMonitor reviewed radio send")
-    except Exception as exc:
-        _LOGGER.exception("Unable to schedule reviewed MeshMonitor send")
-        connection.send_error(msg["id"], "queue_failed", type(exc).__name__)
+        if source_type == SOURCE_TYPE_RETICULUM:
+            reticulum_result = await client.send_reticulum_message(
+                msg["source_id"], msg["text"], to_destination_hash=msg.get("destination", "")
+            )
+            delivery_state = reticulum_result.state
+            message_id = reticulum_result.id
+        elif source_type == SOURCE_TYPE_MESHCORE:
+            meshcore_result = await client.send_meshcore_message(
+                msg["source_id"],
+                msg["text"],
+                channel=msg.get("channel"),
+                to_public_key=msg.get("destination"),
+            )
+            if not meshcore_result.success:
+                raise MeshMonitorResponseError("MeshMonitor rejected the send")
+            delivery_state = meshcore_result.delivery_state
+            message_id = meshcore_result.message_id
+        else:
+            meshtastic_result = await client.send_meshtastic_message(
+                msg["source_id"],
+                msg["text"],
+                channel=msg.get("channel"),
+                to_node_id=msg.get("destination"),
+            )
+            if not meshtastic_result.success:
+                raise MeshMonitorResponseError("MeshMonitor rejected the send")
+            delivery_state = meshtastic_result.delivery_state
+            message_id = meshtastic_result.message_id
+    except MeshMonitorAuthenticationError:
+        connection.send_error(msg["id"], "invalid_auth", "MeshMonitor rejected the token")
         return
+    except MeshMonitorPermissionError:
+        connection.send_error(
+            msg["id"], "permission_denied", "MeshMonitor token lacks messages:write"
+        )
+        return
+    except MeshMonitorTransmitDisabledError:
+        connection.send_error(msg["id"], "source_tx_disabled", "MeshMonitor transmit is disabled")
+        return
+    except MeshMonitorRateLimitError:
+        connection.send_error(msg["id"], "rate_limited", "MeshMonitor rate limit reached")
+        return
+    except (MeshMonitorConnectionError, MeshMonitorServerError):
+        connection.send_error(msg["id"], "cannot_connect", "MeshMonitor is unreachable")
+        return
+    except (MeshMonitorNotFoundError, MeshMonitorResponseError):
+        connection.send_error(msg["id"], "send_failed", "MeshMonitor rejected the send")
+        return
+    except ValueError:
+        # Defensive parity with the pre-reservation validation above. This
+        # path should be unreachable unless the client contract changes.
+        connection.send_error(
+            msg["id"], "invalid_format", "Message or destination failed validation"
+        )
+        return
+
     connection.send_result(
         msg["id"],
-        {"accepted": True, "message_id": None, "delivery_state": "ha_queued"},
+        {
+            "accepted": True,
+            "message_id": message_id,
+            "delivery_state": delivery_state or "accepted",
+        },
     )
+    message_runtime = (
+        hass.data.get(DOMAIN, {}).get("message_coordinators", {}).get(entry.entry_id)
+    )
+    if message_runtime:
+        hass.async_create_task(
+            message_runtime["coordinator"].async_request_refresh(),
+            f"{DOMAIN} refresh messages after accepted send",
+        )
 
 
 @websocket_command(

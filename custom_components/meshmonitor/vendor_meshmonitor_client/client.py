@@ -407,6 +407,8 @@ class MeshMonitorClient:
                 raise ValueError("reply_to_hash must contain hexadecimal digits")
             payload["replyToHash"] = reply_to_hash.lower()
         response = await self._post_json(self._reticulum_path(source_id, "messages"), payload)
+        if response.get("success") is False:
+            raise MeshMonitorResponseError("MeshMonitor did not accept the Reticulum message")
         try:
             return ReticulumMessage.from_dict(_nested_object(response, "data"))
         except ValueError as exc:

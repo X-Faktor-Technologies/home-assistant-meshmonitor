@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import vm from "node:vm";
 
 import {
+  completeMessagesRefresh,
   conversationSourceChoices,
   messageByteLimit,
   messageConversationCatalog,
@@ -10,12 +12,19 @@ import {
   messageDirectPeerId,
   messageDraftValidation,
   messagePresentation,
+  pendingMessagePresentation,
   messageSenderName,
   messageSendNonce,
   messageTimestampMs,
+  messageTimelineAtBottom,
+  messageTimelineRestorePosition,
   messagesInConversation,
+  shouldDeferMessagesRender,
+  shouldFlushDeferredMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
+  wireMessageInteractionGuard,
+  wireMessageTimelineControl,
 } from "../../custom_components/meshmonitor/frontend/message-view.js";
 
 const SOURCE = {
@@ -275,7 +284,7 @@ test("send nonce works on HTTP origins without crypto.randomUUID", () => {
   assert.equal(messageSendNonce(cryptoWithoutUuid).length, 32);
 });
 
-test("radio-backed sends use HA's supported queued WebSocket command", () => {
+test("radio-backed sends await MeshMonitor and preserve its acceptance state", () => {
   const panel = readFileSync(
     new URL(
       "../../custom_components/meshmonitor/frontend/meshmonitor-panel.js",
@@ -289,7 +298,23 @@ test("radio-backed sends use HA's supported queued WebSocket command", () => {
   assert.match(panel, /nonce: pending\.id/);
   assert.doesNotMatch(panel, /crypto\.randomUUID/);
   assert.doesNotMatch(panel, /connection\.sendMessagePromise/);
-  assert.match(panel, /pending\.state = "queued"/);
+  assert.match(panel, /pending\.state = "accepted"/);
+  assert.match(panel, /pending\.deliveryState = result\.delivery_state \|\| "accepted"/);
+  assert.doesNotMatch(panel, /Queued once by Home Assistant/);
+  assert.deepEqual(
+    pendingMessagePresentation({ state: "accepted", deliveryState: "sent" }),
+    {
+      label: "Accepted by MeshMonitor",
+      title: "MeshMonitor reported sent; stored history and radio delivery are not confirmed",
+    },
+  );
+  assert.deepEqual(
+    pendingMessagePresentation({ state: "accepted", deliveryState: "queued" }),
+    {
+      label: "Accepted by MeshMonitor",
+      title: "MeshMonitor reported queued; stored history and radio delivery are not confirmed",
+    },
+  );
 });
 
 test("timeline presentation keeps provenance compact and deterministic", () => {
@@ -343,6 +368,355 @@ test("outbound history never becomes unread", () => {
   assert.equal(presentation.unread, false);
 });
 
+test("timer refresh deferral protects live composer engagement", async () => {
+  let composerEngagedAtCompletion = false;
+  const refresh = Promise.resolve().then(() => {
+    composerEngagedAtCompletion = true;
+  });
+  await refresh;
+
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: true,
+      composerEngagedAtCompletion,
+      messagePointerActive: false,
+    }),
+    true,
+    "focus acquired while a refresh is in flight must prevent destructive rendering",
+  );
+  assert.equal(shouldDeferMessagesRender({
+    background: true,
+    messagePointerActive: true,
+  }), true, "pointerdown through click must not be interrupted by a refresh render");
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: true,
+      composerEngagedAtCompletion: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldDeferMessagesRender({
+      background: false,
+      composerEngagedAtCompletion: true,
+    }),
+    false,
+  );
+
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /this\._load\(\{ background: true \}\)/);
+  const request = panel.indexOf("await this._hass.callWS({ type: \"meshmonitor/panel\" })");
+  const finallyPath = panel.indexOf("} finally {", request);
+  assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
+  assert.match(panel, /activeElement: this\.shadowRoot\?\.activeElement/);
+  assert.match(panel, /messagePointerActive: this\._messagePointerActive/);
+  assert.match(panel, /_completeBackgroundRender\(\)/);
+  const loadFinally = panel.slice(finallyPath, panel.indexOf("\n  _allNodes()", finallyPath));
+  assert.match(loadFinally, /_completeBackgroundRender/);
+  assert.match(panel, /if \(this\._tab === "overview"\) this\._completeBackgroundRender\(\)/);
+  assert.match(panel, /_render\(\) \{\s+if \(!this\.shadowRoot\) return;\s+this\._deferredMessagesRender = false;/);
+  assert.doesNotMatch(panel, /compose-text"\)\?\.addEventListener\("blur"/);
+  assert.doesNotMatch(panel, /addEventListener\("blur"/);
+  assert.match(panel, /_flushDeferredMessagesRender\(\)/);
+  assert.match(panel, /target\.addEventListener\("focusout"/);
+});
+
+test("background refresh preserves an engaged composer's focus and caret", () => {
+  const textarea = {
+    value: "A deliberately unfinished draft",
+    selectionStart: 14,
+    selectionEnd: 14,
+    closest(selector) {
+      return selector === ".compose" || selector.includes(".messages-view")
+        ? { className: "compose" }
+        : null;
+    },
+  };
+  let deferred = false;
+  let destructiveRenderCount = 0;
+
+  const outcome = completeMessagesRefresh({
+    background: true,
+    activeElement: textarea,
+    onDefer: () => { deferred = true; },
+    onRender: () => {
+      destructiveRenderCount += 1;
+      textarea.value = "";
+      textarea.selectionStart = 0;
+      textarea.selectionEnd = 0;
+    },
+  });
+
+  assert.equal(outcome, "deferred");
+  assert.equal(deferred, true);
+  assert.equal(destructiveRenderCount, 0);
+  assert.equal(textarea.value, "A deliberately unfinished draft");
+  assert.equal(textarea.selectionStart, 14);
+  assert.equal(textarea.selectionEnd, 14);
+});
+
+test("the panel load lifecycle preserves focused Messages controls", async () => {
+  const panelSource = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  )
+    .replace(/^import[\s\S]*?;\n/gm, "")
+    .replace(/if \(!customElements\.get[\s\S]*$/m, "")
+    .replace(
+      "class MeshMonitorPanel extends HTMLElement",
+      "globalThis.MeshMonitorPanel = class MeshMonitorPanel extends HTMLElement",
+    );
+  const context = {
+    HTMLElement: class {},
+    completeMessagesRefresh,
+  };
+  vm.runInNewContext(panelSource, context);
+
+  for (const control of [
+    {
+      id: "compose-text",
+      value: "A draft that must survive",
+      selectionStart: 11,
+      selectionEnd: 11,
+      closest: (selector) => selector === ".compose" || selector.includes(".messages-view")
+        ? { className: "compose" }
+        : null,
+    },
+    {
+      id: "message-search",
+      value: "remote node",
+      selectionStart: 6,
+      selectionEnd: 6,
+      closest: (selector) => selector.includes(".messages-view")
+        ? { className: "conversation-shell" }
+        : null,
+    },
+    {
+      id: "notification-target",
+      tab: "overview",
+      value: "notify.mobile_app",
+      selectionStart: 5,
+      selectionEnd: 5,
+      closest: (selector) => selector.includes(".notification-dialog")
+        ? { className: "notification-dialog" }
+        : null,
+    },
+  ]) {
+    const panel = Object.create(context.MeshMonitorPanel.prototype);
+    panel._data = { sources: [] };
+    panel._notificationSettings = {};
+    panel._tab = control.tab || "messages";
+    panel._loading = false;
+    panel._mapInstance = null;
+    panel._messagePointerActive = false;
+    panel._deferredMessagesRender = false;
+    panel.shadowRoot = { activeElement: control };
+    panel._applyFavoriteOverrides = () => {};
+    panel._hass = { callWS: async () => ({ sources: [] }) };
+    let renderCount = 0;
+    panel._render = () => {
+      renderCount += 1;
+      control.value = "";
+      control.selectionStart = 0;
+      control.selectionEnd = 0;
+    };
+
+    await panel._load({ background: true });
+
+    assert.equal(panel._deferredMessagesRender, true);
+    assert.equal(renderCount, 0);
+    assert.notEqual(control.value, "");
+    assert.notEqual(control.selectionStart, 0);
+    assert.equal(panel.shadowRoot.activeElement, control);
+  }
+});
+
+test("notification edits survive refresh and commit only on Save", async () => {
+  const panelSource = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  )
+    .replace(/^import[\s\S]*?;\n/gm, "")
+    .replace(/if \(!customElements\.get[\s\S]*$/m, "")
+    .replace(
+      "class MeshMonitorPanel extends HTMLElement",
+      "globalThis.MeshMonitorPanel = class MeshMonitorPanel extends HTMLElement",
+    );
+  const context = { HTMLElement: class {} };
+  vm.runInNewContext(panelSource, context);
+
+  const panel = Object.create(context.MeshMonitorPanel.prototype);
+  panel._notificationSettings = {
+    enabled: false,
+    target: "notify.old",
+    scope: "all",
+    include_preview: false,
+    targets: [
+      { id: "notify.old", label: "Old", entity_id: "notify.old" },
+      { id: "notify.new", label: "New", entity_id: "notify.new" },
+    ],
+  };
+  panel._notificationSaving = false;
+  panel._notificationError = "";
+  let renderCount = 0;
+  panel._render = () => { renderCount += 1; };
+  const refreshedSettings = {
+    enabled: false,
+    target: "notify.old",
+    scope: "channel",
+    include_preview: false,
+    targets: panel._notificationSettings.targets,
+  };
+  const savedSettings = {
+    enabled: true,
+    target: "notify.new",
+    scope: "direct",
+    include_preview: true,
+    targets: panel._notificationSettings.targets,
+  };
+  panel._hass = {
+    callWS: async (request) => request.type === "meshmonitor/notification_settings"
+      ? refreshedSettings
+      : savedSettings,
+  };
+
+  panel._openNotificationDialog();
+  panel._notificationDraft.enabled = true;
+  panel._notificationDraft.target = "notify.new";
+  panel._notificationDraft.scope = "direct";
+  panel._notificationDraft.include_preview = true;
+
+  await panel._loadNotificationSettings();
+
+  const rerendered = panel._notificationDialog();
+  assert.match(rerendered, /id="notification-enabled" type="checkbox" checked/);
+  assert.match(rerendered, /value="notify.new" selected/);
+  assert.match(rerendered, /value="direct" selected/);
+  assert.match(rerendered, /id="notification-preview" type="checkbox" checked/);
+  assert.equal(panel._notificationSettings.enabled, false);
+  assert.equal(panel._notificationSettings.target, "notify.old");
+
+  await panel._saveNotificationSettings();
+  assert.deepEqual(panel._notificationSettings, savedSettings);
+  assert.equal(panel._notificationDialogOpen, false);
+  assert.equal(panel._notificationDraft, null);
+  assert.equal(renderCount, 3);
+
+  panel._openNotificationDialog();
+  panel._notificationDraft.enabled = false;
+  panel._closeNotificationDialog();
+  assert.equal(panel._notificationDraft, null);
+  assert.equal(panel._notificationSettings.enabled, true);
+});
+
+test("whole-workspace pointer guard protects controls until click delivery", () => {
+  const messageWorkspace = new EventTarget();
+  const releaseTarget = new EventTarget();
+  const scheduled = [];
+  let pointerActive = false;
+  let clickDelivered = false;
+  wireMessageInteractionGuard(
+    messageWorkspace,
+    (active) => { pointerActive = active; },
+    (callback) => scheduled.push(callback),
+    releaseTarget,
+  );
+  messageWorkspace.addEventListener("click", () => { clickDelivered = true; });
+
+  messageWorkspace.dispatchEvent(new Event("pointerdown"));
+  assert.equal(pointerActive, true);
+  assert.equal(shouldDeferMessagesRender({
+    background: true,
+    messagePointerActive: pointerActive,
+  }), true, "refresh completion between pointerdown and click must defer rendering");
+
+  releaseTarget.dispatchEvent(new Event("pointerup"));
+  assert.equal(pointerActive, true, "pointerup defers release until after click dispatch");
+  messageWorkspace.dispatchEvent(new Event("click"));
+  assert.equal(clickDelivered, true);
+  scheduled.shift()();
+  assert.equal(pointerActive, false);
+
+  messageWorkspace.dispatchEvent(new Event("pointerdown"));
+  assert.equal(pointerActive, true);
+  releaseTarget.dispatchEvent(new Event("pointercancel"));
+  scheduled.shift()();
+  assert.equal(pointerActive, false, "release outside Messages cannot leave the guard active");
+
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(panel, /querySelector\("\.messages-view"\)/);
+  assert.match(panel, /querySelector\("#notification-bell"\)/);
+  assert.match(panel, /querySelector\("\.notification-dialog"\)/);
+  assert.match(panel, /wireMessageInteractionGuard\(target,/);
+});
+
+test("deferred refresh flushes only after message interaction ends", () => {
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+  }), true);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    composerEngaged: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    messagesEngaged: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: true,
+    messagePointerActive: true,
+  }), false);
+  assert.equal(shouldFlushDeferredMessagesRender({
+    deferred: false,
+  }), false);
+});
+
+test("message timelines force latest only for selections and sends", () => {
+  assert.equal(
+    messageTimelineRestorePosition({ forceToBottom: true, saved: { top: 120 } }),
+    "bottom",
+  );
+  assert.equal(
+    messageTimelineRestorePosition({ saved: { atBottom: true, top: 120 } }),
+    "bottom",
+  );
+  assert.equal(
+    messageTimelineRestorePosition({ saved: { atBottom: false, top: 120 } }),
+    120,
+  );
+  assert.equal(messageTimelineAtBottom({ scrollHeight: 1000, clientHeight: 400, scrollTop: 600 }), true);
+  assert.equal(messageTimelineAtBottom({ scrollHeight: 1000, clientHeight: 400, scrollTop: 500 }), false);
+});
+
+test("scroll-to-latest follows real scroll and click transitions", () => {
+  const timeline = new EventTarget();
+  timeline.scrollHeight = 1000;
+  timeline.clientHeight = 400;
+  timeline.scrollTop = 300;
+  let focused = false;
+  timeline.focus = () => { focused = true; };
+  const button = new EventTarget();
+  button.hidden = true;
+
+  wireMessageTimelineControl(timeline, button);
+  assert.equal(button.hidden, false, "control appears while reading older messages");
+
+  button.dispatchEvent(new Event("click"));
+  assert.equal(timeline.scrollTop, 1000);
+  assert.equal(button.hidden, true);
+  assert.equal(focused, true, "keyboard focus returns to the timeline after jumping");
+
+  timeline.scrollTop = 200;
+  timeline.dispatchEvent(new Event("scroll"));
+  assert.equal(button.hidden, false);
+});
+
 test("Messages includes persistent backend notification controls", () => {
   const panel = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
@@ -386,6 +760,18 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.match(panel, /scrollbar-gutter:stable/);
   assert.match(panel, /class="messages"[^>]+role="log"[^>]+tabindex="0"/);
   assert.match(panel, /_messageScrollByConversation/);
+  assert.match(panel, /_forceMessageScrollToBottom = true/);
+  assert.match(panel, /id = "scroll-to-latest"/);
+  assert.match(panel, /button\.textContent = "Scroll to latest"/);
+  assert.match(panel, /button\.type = "button"/);
+  assert.match(panel, /wrapper\.className = "timeline-wrapper"/);
+  assert.match(panel, /timeline\.replaceWith\(wrapper\);\s+wrapper\.append\(timeline, button\)/);
+  assert.match(panel, /wireMessageTimelineControl\(timeline, button\)/);
+  assert.match(panel, /\.timeline-wrapper \{ grid-row:2; position:relative; min-width:0; min-height:0; \}/);
+  assert.match(panel, /@media\(max-width:760px\)\{\.timeline-wrapper\{grid-row:1\}\}/);
+  assert.match(panel, /\.scroll-to-latest \{ position:absolute; right:20px; bottom:16px;/);
+  assert.doesNotMatch(panel, /bottom:116px/);
+  assert.match(panel, /\.scroll-to-latest:focus-visible \{ outline:3px solid var\(--primary-color\)/);
   assert.match(panel, /id="compose-send"/);
   assert.match(panel, /this\._sending \? "Sending…" : "Send"/);
   assert.match(panel, /data-reply-message/);
@@ -396,8 +782,28 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.match(panel, /border-bottom-right-radius:0/);
   assert.match(panel, /main\.messages-view \{[^}]*overflow:hidden/);
   assert.match(panel, /#compose-send \{[^}]*background:var\(--primary-color\)/);
+  assert.match(panel, /\.compose-route\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/);
+  assert.match(panel, /\.compose-action #compose-send\{[^}]*width:100%[^}]*min-height:44px/);
+  assert.match(panel, /\.conversation-shell\{height:100%[^}]*min-height:0/);
+  assert.match(panel, /\.compose textarea\{[^}]*min-height:44px[^}]*max-height:96px/);
+  assert.match(panel, /\.compose-note\{display:none/);
+  assert.match(panel, /safe-area-inset-bottom/);
+  assert.doesNotMatch(panel, /height:max\(640px,calc\(100dvh - 92px\)\)/);
   assert.doesNotMatch(panel, /\.conversation-item \{[^}]*border-bottom:/);
   assert.doesNotMatch(panel, /window\.confirm/);
   assert.doesNotMatch(panel, /Review outbound message/);
   assert.doesNotMatch(panel, /\.message \{[^}]*border-left:4px/);
+});
+
+test("message bubbles are content-sized and safely wrap at every breakpoint", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /\.message \{ width:fit-content; max-width:min\(82%,760px\)/);
+  assert.match(panel, /\.message-text \{[^}]*overflow-wrap:anywhere/);
+  assert.match(panel, /@media\(max-width:760px\)[\s\S]*?\.message \{ width:fit-content; max-width:100%/);
+  assert.match(panel, /\.message\.incoming \{[^}]*border-bottom-left-radius:0/);
+  assert.match(panel, /\.message\.outgoing \{[^}]*border-bottom-right-radius:0/);
 });
