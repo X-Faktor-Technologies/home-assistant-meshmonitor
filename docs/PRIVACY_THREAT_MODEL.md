@@ -5,7 +5,7 @@ it deliberately leaves out, and the safeguards contributors must preserve. It
 is written for reviewers and advanced users; everyday privacy choices are
 summarized in the [user guide](USER_GUIDE.md).
 
-It covers the integration's 0.16.0 API-backed entities, panel,
+It covers the integration's 0.17.0 release-line API-backed entities, panel,
 messages, map, position history, favorites, and outbound-message surface. It
 does not make claims about MeshMonitor, Meshtastic, MeshCore, Home Assistant,
 radio firmware, or notification providers beyond how this integration uses

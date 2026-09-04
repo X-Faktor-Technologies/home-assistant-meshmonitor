@@ -5,7 +5,7 @@ questions: which MeshMonitor features are supported, which permissions they
 need, and which features intentionally stay in MeshMonitor instead of Home
 Assistant.
 
-The matrix was last audited on 2026-08-26 against MeshMonitor 4.15.1, the
+The matrix was last audited on 2026-09-03 against MeshMonitor 4.15.2, the
 current stable upstream release. The integration supports MeshMonitor 4.14.x
 and 4.15.x. Upstream `main` is monitored for compatibility planning but is
 not a supported contract until those changes appear in a stable release.
@@ -61,24 +61,23 @@ directly.
 
 ## Compatibility watch
 
-MeshMonitor development after 4.15.1 includes unreleased MeshCore contact,
-telemetry, neighbor, and device-action routes. They are promising candidates,
-but their schemas and permissions are not treated as stable yet.
+MeshMonitor 4.15.2 adds Mesh Issues reporting, Device Health automation types,
+per-source MeshCore path-hash settings, and MeshCore neighbor polling and age
+data. Static route comparison found no removed or renamed API route currently
+used by the integration. The existing read-only and messaging surfaces remain
+compatible, including the explicitly configured per-source path-hash setting
+owned by MeshMonitor.
 
-When the next stable MeshMonitor release ships:
+The leading enhancement candidates are a compact read-only Mesh Issues summary
+and typed MeshCore neighbor-age visibility. Device Health automation types can
+flow through the existing bounded automation surface after their stable payload
+shape is covered. Path-hash writes, neighbor polling, firmware, restore,
+scripts, and other server or radio administration remain in MeshMonitor unless
+a separate reviewed Home Assistant use case justifies changing that boundary.
 
-1. Diff its OpenAPI and supported route documentation against 4.15.1.
-2. Classify each change by permission, persistence, transmission, privacy, and
-   request cost.
-3. Add or update typed client models and synthetic contract tests first.
-4. Preserve 4.14.x and 4.15.x behavior unless a documented support decision
-   says otherwise.
-5. Expose only capabilities that improve daily Home Assistant monitoring.
-
-The leading enhancement candidate is read-only MeshCore contact detail,
-telemetry, and neighbor visibility. Device-changing requests must remain a
-separate, explicitly reviewed slice with administrator, option, permission,
-rate, result, and no-retry safeguards.
+The known stale MeshCore contact timestamp behavior is not corrected by
+MeshMonitor 4.15.2. The integration must continue to avoid presenting that
+timestamp as reliable current activity until the upstream contract changes.
 
 ## Release lanes
 
@@ -88,5 +87,6 @@ rate, result, and no-retry safeguards.
   client support, tests, documentation, and real Home Assistant validation.
 
 Documentation-only corrections do not require a ceremonial patch release.
-Stay on 0.16.0 unless a user-visible defect needs 0.16.1; use 0.17.0 for the
-next reviewed feature slice.
+The 0.17.0 release line contains the reviewed lifecycle, Messages, and Home
+Assistant 2026.9 compatibility work; subsequent changes remain one bounded
+slice at a time.
