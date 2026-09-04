@@ -194,6 +194,27 @@ export const sendErrorPresentation = (error) => {
   };
 };
 
+export const pendingMessagePresentation = (pending) => {
+  if (pending.state === "sending")
+    return { label: "Sending", title: "Submitting once to MeshMonitor" };
+  if (pending.state === "accepted") {
+    const deliveryState = String(pending.deliveryState || "accepted").toLowerCase();
+    const label = deliveryState === "sent"
+      ? "Sent"
+      : deliveryState === "queued"
+        ? "Queued by MeshMonitor"
+        : "Accepted by MeshMonitor";
+    return {
+      label,
+      title: `${label}; radio delivery is not confirmed`,
+    };
+  }
+  return {
+    label: "Not sent",
+    title: pending.error || "The send was not accepted",
+  };
+};
+
 export const messagesInConversation = (messages, conversation) =>
   conversation === "all"
     ? [...messages]
@@ -237,6 +258,23 @@ export const shouldDeferMessagesRender = ({
     messagePointerActive
   );
 
+export const completeMessagesRefresh = ({
+  background = false,
+  activeElement = null,
+  messagePointerActive = false,
+  onDefer,
+  onRender,
+} = {}) => {
+  const deferred = shouldDeferMessagesRender({
+    background,
+    composerEngagedAtCompletion: activeElement?.closest?.(".compose") != null,
+    messagePointerActive,
+  });
+  if (deferred) onDefer?.();
+  else onRender?.();
+  return deferred ? "deferred" : "rendered";
+};
+
 export const wireMessageInteractionGuard = (
   target,
   onActiveChange,
@@ -267,6 +305,20 @@ export const messageTimelineAtBottom = (
   { scrollHeight, clientHeight, scrollTop },
   threshold = 48,
 ) => scrollHeight - clientHeight - scrollTop < threshold;
+
+export const wireMessageTimelineControl = (timeline, button) => {
+  const update = () => {
+    button.hidden = messageTimelineAtBottom(timeline);
+  };
+  button.addEventListener("click", () => {
+    timeline.scrollTop = timeline.scrollHeight;
+    update();
+    timeline.focus?.({ preventScroll: true });
+  });
+  timeline.addEventListener("scroll", update);
+  update();
+  return update;
+};
 
 export const messageTimelineRestorePosition = ({
   forceToBottom = false,

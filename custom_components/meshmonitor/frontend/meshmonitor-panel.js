@@ -45,21 +45,23 @@ import {
 } from "./source-view.js?v=20260822-1242";
 import { serverCardPresentation } from "./server-view.js?v=20260820-1810";
 import {
+  completeMessagesRefresh,
   conversationSourceChoices,
   conversationUnreadCounts,
   messageDraftValidation,
   messageConversationCatalog,
   messageConversationKey,
   messagePresentation,
+  pendingMessagePresentation,
   messageSendNonce,
   messageTimestampMs,
   messageTimelineAtBottom,
   messageTimelineRestorePosition,
-  shouldDeferMessagesRender,
   shouldFlushDeferredMessagesRender,
   sortMessagesChronologically,
   sendErrorPresentation,
   wireMessageInteractionGuard,
+  wireMessageTimelineControl,
 } from "./message-view.js?v=20260902-0003";
 import {
   PANEL_TABS,
@@ -293,13 +295,13 @@ class MeshMonitorPanel extends HTMLElement {
     } finally {
       this._loading = false;
       if (refreshMapInPlace && this._mapInstance) this._refreshMapSnapshot();
-      else if (shouldDeferMessagesRender({
+      else completeMessagesRefresh({
         background: background && this._tab === "messages",
-        composerEngagedAtCompletion:
-          this.shadowRoot?.activeElement?.closest?.(".compose") != null,
+        activeElement: this.shadowRoot?.activeElement,
         messagePointerActive: this._messagePointerActive,
-      })) this._deferredMessagesRender = true;
-      else this._render();
+        onDefer: () => { this._deferredMessagesRender = true; },
+        onRender: () => this._render(),
+      });
     }
   }
 
@@ -780,7 +782,7 @@ class MeshMonitorPanel extends HTMLElement {
         .message.pending { opacity:.82; }
         .message-send-state { margin-left:auto; display:inline-flex; align-items:center; gap:5px; }
         .message-send-state.sending::before { content:""; width:10px; height:10px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:message-spin .75s linear infinite; }
-        .message-send-state.queued::before { content:"◷"; font-size:13px; }
+        .message-send-state.accepted::before { content:"✓"; font-size:13px; }
         .message-send-state.failed { color:var(--error-color,#db4437); }
         .message-send-state.failed::before { content:"!"; font-weight:800; }
         @keyframes message-spin { to { transform:rotate(360deg); } }
@@ -2496,12 +2498,7 @@ class MeshMonitorPanel extends HTMLElement {
     button.type = "button";
     button.textContent = "Scroll to latest";
     button.hidden = true;
-    button.addEventListener("click", () => {
-      timeline.scrollTop = timeline.scrollHeight;
-      this._updateScrollToLatest(timeline);
-      timeline.focus({preventScroll: true});
-    });
-    timeline.addEventListener("scroll", () => this._updateScrollToLatest(timeline));
+    wireMessageTimelineControl(timeline, button);
     timeline.replaceWith(wrapper);
     wrapper.append(timeline, button);
   }
@@ -2720,7 +2717,7 @@ class MeshMonitorPanel extends HTMLElement {
     ));
     const selected = catalog.find((item) => item.key === this._conversation);
     this._pendingMessages = this._pendingMessages.filter((pending) => {
-      if (pending.state !== "queued") return true;
+      if (pending.state !== "accepted") return true;
       return !messages.some((message) =>
         messagePresentation(message, this._lastRead, this._data?.sources || []).outgoing === true &&
         this._conversationKey(message) === pending.conversationKey &&
@@ -2750,8 +2747,8 @@ class MeshMonitorPanel extends HTMLElement {
       .filter((pending) => pending.conversationKey === this._conversation)
       .map((pending) => {
         const time = new Date(pending.createdAt).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
-        const stateLabel = pending.state === "sending" ? "Sending" : pending.state === "queued" ? "Queued" : "Not sent";
-        return `<article class="message outgoing pending" role="listitem"><div class="message-head"><span class="message-sender">You</span><time class="message-time">${escapeHtml(time)}</time></div><div class="message-text">${escapeHtml(pending.body)}</div><div class="message-meta"><span>${escapeHtml(pending.sourceName)}</span><span class="message-send-state ${escapeHtml(pending.state)}" title="${pending.state === "queued" ? "Queued once by Home Assistant; radio delivery is not confirmed" : escapeHtml(pending.error || stateLabel)}">${escapeHtml(stateLabel)}</span></div></article>`;
+        const state = pendingMessagePresentation(pending);
+        return `<article class="message outgoing pending" role="listitem"><div class="message-head"><span class="message-sender">You</span><time class="message-time">${escapeHtml(time)}</time></div><div class="message-text">${escapeHtml(pending.body)}</div><div class="message-meta"><span>${escapeHtml(pending.sourceName)}</span><span class="message-send-state ${escapeHtml(pending.state)}" title="${escapeHtml(state.title)}">${escapeHtml(state.label)}</span></div></article>`;
       }).join("");
     const rail = ["channel","direct"].map((type) => `<div class="rail-heading">${type === "channel" ? "Channels" : "Direct messages"}</div>${catalog.filter((item)=>item.type===type).map((item)=>`<button class="conversation-item ${this._conversation===item.key?"active":""}" data-conversation="${escapeHtml(item.key)}" aria-pressed="${this._conversation===item.key}"><span class="conversation-icon">${type==="channel"?"#":"↔"}</span><span class="conversation-label"><strong>${this._pinnedConversations.has(item.key)?"★ ":""}${escapeHtml(item.name)}</strong><small>${escapeHtml(item.detail)}${this._mutedConversations.has(item.key)?" · muted":""}</small></span>${unreadCounts.get(item.key)?`<span class="unread-count" aria-label="${unreadCounts.get(item.key)} unread">${unreadCounts.get(item.key)}</span>`:""}<span class="badge protocol-${escapeHtml(item.protocol)}">${escapeHtml(item.protocol)}</span></button>`).join("")}`).join("");
     const picker = `<div class="conversation-picker-wrap"><select id="conversation-picker" class="conversation-picker" aria-label="Choose channel or conversation"><option value="all" ${this._conversation==="all"?"selected":""}>All messages</option>${catalog.map((item)=>`<option value="${escapeHtml(item.key)}" ${this._conversation===item.key?"selected":""}>${item.type==="channel"?"# ":"↔ "}${escapeHtml(item.name)}${unreadCounts.get(item.key)?` (${unreadCounts.get(item.key)} unread)`:""}</option>`).join("")}</select></div>`;
@@ -2971,7 +2968,8 @@ class MeshMonitorPanel extends HTMLElement {
       else request.channel = conversation.channel;
       const result = await this._hass.callWS(request);
       if (result.accepted) {
-        pending.state = "queued";
+        pending.state = "accepted";
+        pending.deliveryState = result.delivery_state || "accepted";
         this._render();
         try {
           await this._load();

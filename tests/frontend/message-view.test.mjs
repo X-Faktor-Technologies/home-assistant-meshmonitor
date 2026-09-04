@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  completeMessagesRefresh,
   conversationSourceChoices,
   messageByteLimit,
   messageConversationCatalog,
@@ -10,6 +11,7 @@ import {
   messageDirectPeerId,
   messageDraftValidation,
   messagePresentation,
+  pendingMessagePresentation,
   messageSenderName,
   messageSendNonce,
   messageTimestampMs,
@@ -21,6 +23,7 @@ import {
   sortMessagesChronologically,
   sendErrorPresentation,
   wireMessageInteractionGuard,
+  wireMessageTimelineControl,
 } from "../../custom_components/meshmonitor/frontend/message-view.js";
 
 const SOURCE = {
@@ -280,7 +283,7 @@ test("send nonce works on HTTP origins without crypto.randomUUID", () => {
   assert.equal(messageSendNonce(cryptoWithoutUuid).length, 32);
 });
 
-test("radio-backed sends use HA's supported queued WebSocket command", () => {
+test("radio-backed sends await MeshMonitor and preserve its acceptance state", () => {
   const panel = readFileSync(
     new URL(
       "../../custom_components/meshmonitor/frontend/meshmonitor-panel.js",
@@ -294,7 +297,20 @@ test("radio-backed sends use HA's supported queued WebSocket command", () => {
   assert.match(panel, /nonce: pending\.id/);
   assert.doesNotMatch(panel, /crypto\.randomUUID/);
   assert.doesNotMatch(panel, /connection\.sendMessagePromise/);
-  assert.match(panel, /pending\.state = "queued"/);
+  assert.match(panel, /pending\.state = "accepted"/);
+  assert.match(panel, /pending\.deliveryState = result\.delivery_state \|\| "accepted"/);
+  assert.doesNotMatch(panel, /Queued once by Home Assistant/);
+  assert.deepEqual(
+    pendingMessagePresentation({ state: "accepted", deliveryState: "sent" }),
+    { label: "Sent", title: "Sent; radio delivery is not confirmed" },
+  );
+  assert.deepEqual(
+    pendingMessagePresentation({ state: "accepted", deliveryState: "queued" }),
+    {
+      label: "Queued by MeshMonitor",
+      title: "Queued by MeshMonitor; radio delivery is not confirmed",
+    },
+  );
 });
 
 test("timeline presentation keeps provenance compact and deterministic", () => {
@@ -391,9 +407,9 @@ test("timer refresh deferral protects live composer engagement", async () => {
   const request = panel.indexOf("await this._hass.callWS({ type: \"meshmonitor/panel\" })");
   const finallyPath = panel.indexOf("} finally {", request);
   assert.ok(request >= 0 && request < finallyPath, "finally follows the asynchronous request");
-  assert.match(panel, /composerEngagedAtCompletion:\s+this\.shadowRoot\?\.activeElement\?\.closest\?\.\("\.compose"\) != null/);
+  assert.match(panel, /activeElement: this\.shadowRoot\?\.activeElement/);
   assert.match(panel, /messagePointerActive: this\._messagePointerActive/);
-  assert.match(panel, /else if \(shouldDeferMessagesRender\(\{/);
+  assert.match(panel, /else completeMessagesRefresh\(\{/);
   const loadFinally = panel.slice(finallyPath, panel.indexOf("\n  _allNodes()", finallyPath));
   assert.match(loadFinally, /activeElement/);
   assert.match(panel, /_render\(\) \{\s+if \(!this\.shadowRoot\) return;\s+this\._deferredMessagesRender = false;/);
@@ -401,6 +417,38 @@ test("timer refresh deferral protects live composer engagement", async () => {
   assert.doesNotMatch(panel, /addEventListener\("blur"/);
   assert.match(panel, /_flushDeferredMessagesRender\(\)/);
   assert.match(panel, /composer\?\.addEventListener\("focusout"/);
+});
+
+test("background refresh preserves an engaged composer's focus and caret", () => {
+  const textarea = {
+    value: "A deliberately unfinished draft",
+    selectionStart: 14,
+    selectionEnd: 14,
+    closest(selector) {
+      return selector === ".compose" ? { className: "compose" } : null;
+    },
+  };
+  let deferred = false;
+  let destructiveRenderCount = 0;
+
+  const outcome = completeMessagesRefresh({
+    background: true,
+    activeElement: textarea,
+    onDefer: () => { deferred = true; },
+    onRender: () => {
+      destructiveRenderCount += 1;
+      textarea.value = "";
+      textarea.selectionStart = 0;
+      textarea.selectionEnd = 0;
+    },
+  });
+
+  assert.equal(outcome, "deferred");
+  assert.equal(deferred, true);
+  assert.equal(destructiveRenderCount, 0);
+  assert.equal(textarea.value, "A deliberately unfinished draft");
+  assert.equal(textarea.selectionStart, 14);
+  assert.equal(textarea.selectionEnd, 14);
 });
 
 test("message pointer guard protects activation until click delivery", () => {
@@ -480,6 +528,29 @@ test("message timelines force latest only for selections and sends", () => {
   assert.equal(messageTimelineAtBottom({ scrollHeight: 1000, clientHeight: 400, scrollTop: 500 }), false);
 });
 
+test("scroll-to-latest follows real scroll and click transitions", () => {
+  const timeline = new EventTarget();
+  timeline.scrollHeight = 1000;
+  timeline.clientHeight = 400;
+  timeline.scrollTop = 300;
+  let focused = false;
+  timeline.focus = () => { focused = true; };
+  const button = new EventTarget();
+  button.hidden = true;
+
+  wireMessageTimelineControl(timeline, button);
+  assert.equal(button.hidden, false, "control appears while reading older messages");
+
+  button.dispatchEvent(new Event("click"));
+  assert.equal(timeline.scrollTop, 1000);
+  assert.equal(button.hidden, true);
+  assert.equal(focused, true, "keyboard focus returns to the timeline after jumping");
+
+  timeline.scrollTop = 200;
+  timeline.dispatchEvent(new Event("scroll"));
+  assert.equal(button.hidden, false);
+});
+
 test("Messages includes persistent backend notification controls", () => {
   const panel = readFileSync(
     new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
@@ -529,9 +600,7 @@ test("conversation DOM keeps a visible focusable scroll region and calm cards", 
   assert.match(panel, /button\.type = "button"/);
   assert.match(panel, /wrapper\.className = "timeline-wrapper"/);
   assert.match(panel, /timeline\.replaceWith\(wrapper\);\s+wrapper\.append\(timeline, button\)/);
-  assert.match(panel, /timeline\.addEventListener\("scroll", \(\) => this\._updateScrollToLatest\(timeline\)\)/);
-  assert.match(panel, /timeline\.scrollTop = timeline\.scrollHeight/);
-  assert.match(panel, /timeline\.focus\(\{preventScroll: true\}\)/);
+  assert.match(panel, /wireMessageTimelineControl\(timeline, button\)/);
   assert.match(panel, /\.timeline-wrapper \{ grid-row:2; position:relative; min-width:0; min-height:0; \}/);
   assert.match(panel, /@media\(max-width:760px\)\{\.timeline-wrapper\{grid-row:1\}\}/);
   assert.match(panel, /\.scroll-to-latest \{ position:absolute; right:20px; bottom:16px;/);

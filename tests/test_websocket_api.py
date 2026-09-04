@@ -782,6 +782,93 @@ async def test_panel_send_reports_meshmonitor_rejection_instead_of_queued() -> N
 
 
 @pytest.mark.asyncio
+async def test_panel_send_rejects_unsuccessful_2xx_receipt() -> None:
+    client = SimpleNamespace(
+        send_meshcore_message=AsyncMock(
+            return_value=SimpleNamespace(
+                success=False,
+                message_id=None,
+                delivery_state=None,
+            )
+        )
+    )
+    entry = SimpleNamespace(
+        entry_id="entry-meshcore",
+        data={CONF_SOURCE_TYPE: "meshcore"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 90,
+        "entry_id": "entry-meshcore",
+        "source_id": "source-meshcore",
+        "protocol": "meshcore",
+        "text": "Hello",
+        "nonce": "2123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "a" * 64,
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch("custom_components.meshmonitor.websocket_api.reserve_message_send"),
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    connection.send_result.assert_not_called()
+    connection.send_error.assert_called_once_with(
+        90, "send_failed", "MeshMonitor rejected the send"
+    )
+
+
+@pytest.mark.asyncio
+async def test_panel_send_validates_before_reserving_transmit_guard() -> None:
+    client = SimpleNamespace(send_meshcore_message=AsyncMock())
+    entry = SimpleNamespace(
+        entry_id="entry-meshcore",
+        data={CONF_SOURCE_TYPE: "meshcore"},
+        options={CONF_ENABLE_TRANSMIT: True},
+        runtime_data=SimpleNamespace(client=client),
+    )
+    hass = Mock()
+    hass.data = {}
+    connection = Mock()
+    message = {
+        "id": 91,
+        "entry_id": "entry-meshcore",
+        "source_id": "source-meshcore",
+        "protocol": "meshcore",
+        "text": "Hello",
+        "nonce": "3123456789abcdef0123456789abcdef",
+        "confirm": "SEND",
+        "destination": "not-a-public-key",
+    }
+
+    with (
+        patch(
+            "custom_components.meshmonitor.websocket_api._loaded_source_entry",
+            return_value=entry,
+        ),
+        patch(
+            "custom_components.meshmonitor.websocket_api.reserve_message_send"
+        ) as reserve,
+    ):
+        await _raw_send_handler()(hass, connection, message)
+
+    reserve.assert_not_called()
+    client.send_meshcore_message.assert_not_awaited()
+    connection.send_error.assert_called_once_with(
+        91, "invalid_format", "Message or destination failed validation"
+    )
+
+
+@pytest.mark.asyncio
 async def test_unfavorite_refreshes_and_reconciles_without_entry_reload() -> None:
     client = Mock()
     client.set_meshtastic_favorite = AsyncMock(return_value=None)

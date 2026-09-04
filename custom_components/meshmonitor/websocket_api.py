@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping
 from time import time
 from typing import TYPE_CHECKING, Any
@@ -75,6 +76,43 @@ if TYPE_CHECKING:
     from . import MeshMonitorConfigEntry, MeshMonitorSourceRuntime
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _validate_panel_message(source_type: str, msg: Mapping[str, Any]) -> None:
+    """Validate the reviewed message before consuming replay/rate-limit state."""
+    text = msg["text"]
+    if not text.strip():
+        raise ValueError("message text must not be empty")
+    try:
+        byte_count = len(text.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("message text must contain valid UTF-8") from exc
+
+    channel = msg.get("channel")
+    destination = msg.get("destination")
+    if source_type == SOURCE_TYPE_RETICULUM:
+        if channel is not None or not re.fullmatch(r"[0-9a-fA-F]{32}", destination or ""):
+            raise ValueError("Reticulum requires a 32-digit destination hash")
+        limit = 4096
+    elif source_type == SOURCE_TYPE_MESHCORE:
+        if channel is not None:
+            if not 0 <= channel <= 255:
+                raise ValueError("MeshCore channel must be between 0 and 255")
+            limit = 130
+        else:
+            if not re.fullmatch(r"[0-9a-fA-F]{64}", destination or ""):
+                raise ValueError("MeshCore destination must contain 64 hexadecimal digits")
+            limit = 150
+    else:
+        if channel is not None:
+            if not 0 <= channel <= 7:
+                raise ValueError("Meshtastic channel must be between 0 and 7")
+        elif not re.fullmatch(r"![0-9a-fA-F]{8}", destination or ""):
+            raise ValueError("Meshtastic destination must be ! plus 8 hexadecimal digits")
+        limit = 200
+
+    if byte_count > limit:
+        raise ValueError(f"message text must not exceed {limit} UTF-8 bytes")
 
 
 def _serialize_node(
@@ -1026,6 +1064,14 @@ async def websocket_send_message(
         return
 
     try:
+        _validate_panel_message(source_type, msg)
+    except ValueError:
+        connection.send_error(
+            msg["id"], "invalid_format", "Message or destination failed validation"
+        )
+        return
+
+    try:
         # Browser controls are a usability layer, not an authorization boundary;
         # panel and automation sends therefore share one backend guard.
         reserve_message_send(hass, f"panel:{msg['nonce']}")
@@ -1049,6 +1095,8 @@ async def websocket_send_message(
                 channel=msg.get("channel"),
                 to_public_key=msg.get("destination"),
             )
+            if not meshcore_result.success:
+                raise MeshMonitorResponseError("MeshMonitor rejected the send")
             delivery_state = meshcore_result.delivery_state
             message_id = meshcore_result.message_id
         else:
@@ -1058,6 +1106,8 @@ async def websocket_send_message(
                 channel=msg.get("channel"),
                 to_node_id=msg.get("destination"),
             )
+            if not meshtastic_result.success:
+                raise MeshMonitorResponseError("MeshMonitor rejected the send")
             delivery_state = meshtastic_result.delivery_state
             message_id = meshtastic_result.message_id
     except MeshMonitorAuthenticationError:
@@ -1079,6 +1129,13 @@ async def websocket_send_message(
         return
     except (MeshMonitorNotFoundError, MeshMonitorResponseError):
         connection.send_error(msg["id"], "send_failed", "MeshMonitor rejected the send")
+        return
+    except ValueError:
+        # Defensive parity with the pre-reservation validation above. This
+        # path should be unreachable unless the client contract changes.
+        connection.send_error(
+            msg["id"], "invalid_format", "Message or destination failed validation"
+        )
         return
 
     message_runtime = (
