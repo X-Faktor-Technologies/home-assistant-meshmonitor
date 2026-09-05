@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed README images in HACS by using absolute public image URLs.
+
 ## 0.17.0
 
 This stable release promotes the node-lifecycle, Messages, and Home Assistant

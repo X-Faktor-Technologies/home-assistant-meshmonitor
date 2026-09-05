@@ -208,6 +208,19 @@ def test_stable_install_does_not_require_prerelease_tracking() -> None:
     assert "MeshMonitor pre-release" not in readme
 
 
+def test_readme_images_use_hacs_safe_absolute_urls() -> None:
+    """Keep README images resolvable outside GitHub's Markdown renderer."""
+    readme = (ROOT / "README.md").read_text()
+    image_targets = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", readme)
+    prefix = (
+        "https://raw.githubusercontent.com/X-Faktor-Technologies/"
+        "home-assistant-meshmonitor/main/"
+    )
+
+    assert image_targets
+    assert all(target.startswith(prefix) for target in image_targets)
+
+
 def test_brand_icons_have_expected_sizes_and_alpha() -> None:
     """Prevent opaque or incorrectly sized brand exports from shipping."""
     brand_dir = ROOT / "custom_components/meshmonitor/brand"
