@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Fixed README images in HACS by using absolute public image URLs.
+## 0.17.1
+
+- Fixed README images in HACS by using absolute public image URLs pinned to a
+  reviewed repository commit.
 
 ## 0.17.0
 
