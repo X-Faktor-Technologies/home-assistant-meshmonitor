@@ -9,7 +9,7 @@ MeshMonitor still handles radio setup, channels, credentials, firmware, and
 server administration. This integration is meant to make day-to-day monitoring
 easy.
 
-- **Latest stable:** `v0.17.0`
+- **Latest stable:** `v0.17.1`
 - **Current pre-release:** None
 
 Back up Home Assistant before installing or upgrading a custom integration.
@@ -36,13 +36,13 @@ The data in these screenshots is fictional. The images use the real
 MeshMonitor panel without exposing a live network. See the
 [screenshot notes](docs/images/README.md) for details.
 
-![MeshMonitor Overview showing source health and activity across a fictional mesh network](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/panel-overview-v0.17.png)
+![MeshMonitor Overview showing source health and activity across a fictional mesh network](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/panel-overview-v0.17.png)
 
-![MeshMonitor Messages showing a fictional conversation and source filters](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/panel-conversations-v0.17.png)
+![MeshMonitor Messages showing a fictional conversation and source filters](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/panel-conversations-v0.17.png)
 
-![MeshMonitor Nodes showing a searchable fictional node list](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/panel-nodes-v0.17.png)
+![MeshMonitor Nodes showing a searchable fictional node list](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/panel-nodes-v0.17.png)
 
-![MeshMonitor Map showing fictional nodes and links](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/panel-map-v0.17.png)
+![MeshMonitor Map showing fictional nodes and links](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/panel-map-v0.17.png)
 
 ## What you need
 
@@ -115,13 +115,13 @@ Add `messages:read` if you want conversations and message events.
 2. Choose **Add integration**.
 3. Search for **MeshMonitor**.
 
-![Home Assistant search results with MeshMonitor selected](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/setup-find-integration.png)
+![Home Assistant search results with MeshMonitor selected](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/setup-find-integration.png)
 
 4. Enter the MeshMonitor address that Home Assistant can reach.
 5. Paste the API token.
 6. Review the sources found by the setup screen and finish setup.
 
-![MeshMonitor connection screen with the server address and API token fields](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/setup-connect.png)
+![MeshMonitor connection screen with the server address and API token fields](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/setup-connect.png)
 
 Use the main MeshMonitor address, such as `https://mesh.example.com`. Do not add
 an API path, username, password, or token to the URL.
@@ -131,12 +131,12 @@ an API path, username, password, or token to the URL.
 Open the MeshMonitor integration and choose **Configure**. Settings are grouped
 into server-wide options and options for each source.
 
-![MeshMonitor Configure menu showing server settings, source settings, and source refresh](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/setup-options-menu.png)
+![MeshMonitor Configure menu showing server settings, source settings, and source refresh](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/setup-options-menu.png)
 
 Start with **Server settings** to choose whether the sidebar panel and
 automation monitoring are enabled.
 
-![MeshMonitor server settings in Home Assistant](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/main/docs/images/setup-server-settings.png)
+![MeshMonitor server settings in Home Assistant](https://raw.githubusercontent.com/X-Faktor-Technologies/home-assistant-meshmonitor/b61ce605c667ef1f59d9316e933133c5d7a26c91/docs/images/setup-server-settings.png)
 
 The defaults are suitable for read-only monitoring:
 
@@ -254,11 +254,11 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-Version `v0.17.0` is the latest stable release. It contains the reviewed
+Version `v0.17.1` is the latest stable release. It contains the reviewed
 node-lifecycle, Messages, and Home Assistant 2026.9 compatibility changes that
 passed the documented RC upgrade, rollback, reinstall, and final-soak gates.
 See the
-[v0.17.0 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.17.0)
+[latest release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/latest)
 and [release process](docs/RELEASE_PROCESS.md) for details.
 
 Version `v0.16.0` remains available as the first stable public release in the
