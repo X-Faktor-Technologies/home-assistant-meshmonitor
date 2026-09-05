@@ -9,8 +9,8 @@ MeshMonitor still handles radio setup, channels, credentials, firmware, and
 server administration. This integration is meant to make day-to-day monitoring
 easy.
 
-- **Latest stable:** `v0.16.0`
-- **Current pre-release:** `v0.17.0-rc.1`
+- **Latest stable:** `v0.17.0`
+- **Current pre-release:** None
 
 Back up Home Assistant before installing or upgrading a custom integration.
 
@@ -76,11 +76,9 @@ HACS is the recommended installation method for tagged releases:
 6. Restart Home Assistant.
 7. Continue with [Add the integration](#add-the-integration).
 
-To test `0.17.0-rc.1`, enable prerelease versions for this repository in HACS
-and select that exact version. Keep `0.16.0` available for rollback until the
-release candidate has passed your normal checks. To roll back, open
-**MeshMonitor** in HACS, choose **Download** or **Redownload**, select exact
-version `0.16.0`, complete the download, and restart Home Assistant.
+To roll back, open **MeshMonitor** in HACS, choose **Download** or
+**Redownload**, select the earlier version, complete the download, and restart
+Home Assistant.
 
 Use the version shown in Home Assistant when reporting a problem.
 
@@ -256,15 +254,15 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-Version `v0.16.0` is the first stable public release and is available through
-the GitHub release and HACS custom-repository flow above. It passed the
-documented clean-install and Home Assistant Lab acceptance gates. See the
-[v0.16.0 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.16.0)
+Version `v0.17.0` is the latest stable release. It contains the reviewed
+node-lifecycle, Messages, and Home Assistant 2026.9 compatibility changes that
+passed the documented RC upgrade, rollback, reinstall, and final-soak gates.
+See the
+[v0.17.0 release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.17.0)
 and [release process](docs/RELEASE_PROCESS.md) for details.
 
-Version `v0.17.0-rc.1` is the current pre-release candidate. It contains the
-reviewed node-lifecycle, Messages, and Home Assistant 2026.9 compatibility
-changes planned for `v0.17.0`; it is not the latest stable release.
+Version `v0.16.0` remains available as the first stable public release in the
+[release history](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/tag/v0.16.0).
 
 - [User guide](docs/USER_GUIDE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
