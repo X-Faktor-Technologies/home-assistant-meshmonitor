@@ -2,11 +2,11 @@
 
 ## Unreleased
 
-## 0.17.0-rc.1
+## 0.17.0
 
-This release candidate collects the node-lifecycle, Messages, and Home
-Assistant 2026.9 compatibility work planned for 0.17.0. It is intended for
-pre-release validation before the stable release.
+This stable release promotes the node-lifecycle, Messages, and Home Assistant
+2026.9 compatibility work validated in `0.17.0-rc.1`. The release candidate
+passed the documented HACS upgrade, rollback, reinstall, and final-soak gates.
 
 - Adopt Home Assistant 2026.9's config-entry-scoped device lookups and concrete
   parent-device IDs while preserving the existing source and node hierarchy.
