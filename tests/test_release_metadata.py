@@ -209,16 +209,17 @@ def test_stable_install_does_not_require_prerelease_tracking() -> None:
 
 
 def test_readme_images_use_hacs_safe_absolute_urls() -> None:
-    """Keep README images resolvable outside GitHub's Markdown renderer."""
+    """Keep README images absolute and pinned to an immutable Git commit."""
     readme = (ROOT / "README.md").read_text()
     image_targets = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", readme)
-    prefix = (
-        "https://raw.githubusercontent.com/X-Faktor-Technologies/"
-        "home-assistant-meshmonitor/main/"
+    pattern = re.compile(
+        r"^https://raw\.githubusercontent\.com/"
+        r"X-Faktor-Technologies/home-assistant-meshmonitor/"
+        r"[0-9a-f]{40}/"
     )
 
     assert image_targets
-    assert all(target.startswith(prefix) for target in image_targets)
+    assert all(pattern.match(target) for target in image_targets)
 
 
 def test_brand_icons_have_expected_sizes_and_alpha() -> None:
