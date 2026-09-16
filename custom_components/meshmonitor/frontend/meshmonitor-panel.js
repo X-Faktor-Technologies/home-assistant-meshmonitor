@@ -598,8 +598,6 @@ class MeshMonitorPanel extends HTMLElement {
         .map-toolbar input[type="range"] { width:110px; margin:0; padding:0; border:0; accent-color:var(--primary-color); }
         .map-canvas { position:relative; background:#081016; }
         .map,.map.leaflet-container { width:100%; height:clamp(540px,70vh,820px); background-color:#081016; background-image:radial-gradient(circle at 18% 22%,#203541 0,transparent 31%),radial-gradient(circle at 82% 76%,#152a34 0,transparent 34%),linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px); background-size:auto,auto,48px 48px,48px 48px; z-index:0; }
-        .map.neutral-dark-tiles .leaflet-tile-pane { filter:grayscale(1) brightness(.34) contrast(1.42); }
-        .map.neutral-dark-tiles::before { content:""; position:absolute; inset:0; z-index:250; pointer-events:none; background:linear-gradient(#05090d52,#05090d52),#18232b42; mix-blend-mode:multiply; }
         .map-stat { position:absolute; z-index:700; top:12px; right:12px; padding:7px 11px; border:1px solid #ffffff1f; border-radius:999px; background:#0b151de8; color:#e3edf3; box-shadow:0 4px 16px #0008; font-size:12px; font-weight:650; pointer-events:none; }
         .leaflet-container { color:#dce7ed; font:14px system-ui,sans-serif; }
         .leaflet-bar { overflow:hidden; border:1px solid #ffffff24!important; border-radius:10px!important; box-shadow:0 4px 14px #0008!important; }
@@ -1559,7 +1557,7 @@ class MeshMonitorPanel extends HTMLElement {
         <div class="map-control-group history"><span class="map-control-label">Trail</span><select id="map-position-range" aria-label="Trail time range">${[[1,"1h"],[6,"6h"],[24,"24h"],[72,"3d"],[168,"7d"]].map(([hours,label]) => `<option value="${hours}" ${this._positionRange === hours ? "selected" : ""}>${label}</option>`).join("")}</select>${playback}${clear}</div>
       </div>
       <div class="map-canvas"><div id="mesh-map" class="map ${mapStyle.className}">${state}</div><span class="map-stat">${mapCountLabel(visible, links.length, trailCount)}</span></div>
-      <div class="map-footer"><div class="map-legend" aria-label="Map legend"><span class="map-legend-item" style="color:var(--protocol-meshtastic)"><i class="legend-dot"></i>Meshtastic</span><span class="map-legend-item" style="color:var(--protocol-meshcore)"><i class="legend-dot"></i>MeshCore</span><span class="map-legend-item" style="color:var(--protocol-reticulum)"><i class="legend-dot"></i>Reticulum</span><span class="map-legend-item" style="color:#48a9ff"><i class="legend-line"></i>Topology</span><span class="map-legend-item" style="color:#d56cff"><i class="legend-line dashed"></i>Neighbor/SNR</span><span class="map-legend-item" style="color:#ffd166"><i class="legend-line"></i>Position trail</span></div><div class="map-tile-state muted">${mapStyle.detail}</div><div class="map-layer-status">${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span></div></div>
+      <div class="map-footer"><div class="map-legend" aria-label="Map legend"><span class="map-legend-item" style="color:var(--protocol-meshtastic)"><i class="legend-dot"></i>Meshtastic</span><span class="map-legend-item" style="color:var(--protocol-meshcore)"><i class="legend-dot"></i>MeshCore</span><span class="map-legend-item" style="color:var(--protocol-reticulum)"><i class="legend-dot"></i>Reticulum</span><span class="map-legend-item" style="color:#48a9ff"><i class="legend-line"></i>Topology</span><span class="map-legend-item" style="color:#d56cff"><i class="legend-line dashed"></i>Neighbor/SNR</span><span class="map-legend-item" style="color:#ffd166"><i class="legend-line"></i>Position trail</span></div><div class="map-tile-state muted" role="status" aria-live="polite">${mapStyle.detail}</div><div class="map-layer-status">${this._mapLayerStatus("topology")}${this._mapLayerStatus("neighbors")}<span id="position-trail-status" class="map-status ${trailBad ? "bad" : this._positionTrail?.state === "supported" ? "ok" : "quiet"}">${escapeHtml(this._positionTrailStatus())}</span></div></div>
     </section>`;
   }
 
@@ -1752,12 +1750,17 @@ class MeshMonitorPanel extends HTMLElement {
     this._mapInstance = map;
     this._mapNodes = visible;
     this._mapLinksVisible = links;
-    if (mapStylePresentation(this._mapStyle).tiles)
-      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
+    const mapStyle = mapStylePresentation(this._mapStyle);
+    for (const layer of mapStyle.layers) {
+      const tiles = window.L.tileLayer(layer.url, layer.options).addTo(map);
+      tiles.on("tileerror", () => {
+        const status = this.shadowRoot?.querySelector(".map-tile-state");
+        if (status) {
+          status.classList.remove("muted");
+          status.textContent = `${mapStyle.detail} · Some map tiles could not load; choose another style`;
+        }
+      });
+    }
     map.createPane("markers");
     map.getPane("markers").style.zIndex = 650;
     map.createPane("mesh-links");

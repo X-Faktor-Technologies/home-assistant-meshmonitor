@@ -1,12 +1,100 @@
 export const MAP_STYLE_STORAGE = "meshmonitor.map.style";
 export const MAP_SHOW_HOME_STORAGE = "meshmonitor.map.showHome";
 export const MAP_STYLES = Object.freeze([
-  Object.freeze({ value: "standard", label: "Standard" }),
-  Object.freeze({ value: "neutral-dark", label: "Neutral dark" }),
+  Object.freeze({ value: "esri-dark", label: "Dark gray" }),
+  Object.freeze({ value: "esri-light", label: "Light gray" }),
+  Object.freeze({ value: "esri-streets", label: "Streets" }),
+  Object.freeze({ value: "esri-topographic", label: "Topographic" }),
+  Object.freeze({ value: "esri-satellite", label: "Satellite" }),
   Object.freeze({ value: "tiles-off", label: "Tiles off / privacy" }),
 ]);
 
 const MAP_STYLE_VALUES = new Set(MAP_STYLES.map(({ value }) => value));
+const ESRI_ROOT = "https://server.arcgisonline.com/ArcGIS/rest/services";
+const ESRI_ATTRIBUTION =
+  'Tiles &copy; <a href="https://www.esri.com/">Esri</a> and its data providers';
+
+const tileLayer = (url, attribution = "") =>
+  Object.freeze({
+    url,
+    options: Object.freeze({
+      maxZoom: 19,
+      ...(attribution ? { attribution } : {}),
+    }),
+  });
+
+const baseAndReference = (base, reference) =>
+  Object.freeze([
+    tileLayer(
+      `${ESRI_ROOT}/${base}/MapServer/tile/{z}/{y}/{x}`,
+      ESRI_ATTRIBUTION,
+    ),
+    tileLayer(`${ESRI_ROOT}/${reference}/MapServer/tile/{z}/{y}/{x}`),
+  ]);
+
+const MAP_PRESENTATIONS = Object.freeze({
+  "esri-dark": Object.freeze({
+    value: "esri-dark",
+    tiles: true,
+    className: "esri-dark-tiles",
+    detail: "Dark gray · Esri and its data providers",
+    layers: baseAndReference(
+      "Canvas/World_Dark_Gray_Base",
+      "Canvas/World_Dark_Gray_Reference",
+    ),
+  }),
+  "esri-light": Object.freeze({
+    value: "esri-light",
+    tiles: true,
+    className: "esri-light-tiles",
+    detail: "Light gray · Esri and its data providers",
+    layers: baseAndReference(
+      "Canvas/World_Light_Gray_Base",
+      "Canvas/World_Light_Gray_Reference",
+    ),
+  }),
+  "esri-streets": Object.freeze({
+    value: "esri-streets",
+    tiles: true,
+    className: "esri-streets-tiles",
+    detail: "Streets · Esri and its data providers",
+    layers: Object.freeze([
+      tileLayer(
+        `${ESRI_ROOT}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`,
+        ESRI_ATTRIBUTION,
+      ),
+    ]),
+  }),
+  "esri-topographic": Object.freeze({
+    value: "esri-topographic",
+    tiles: true,
+    className: "esri-topographic-tiles",
+    detail: "Topographic · Esri and its data providers",
+    layers: Object.freeze([
+      tileLayer(
+        `${ESRI_ROOT}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`,
+        ESRI_ATTRIBUTION,
+      ),
+    ]),
+  }),
+  "esri-satellite": Object.freeze({
+    value: "esri-satellite",
+    tiles: true,
+    className: "esri-satellite-tiles",
+    detail: "Satellite · Esri and its data providers",
+    layers: baseAndReference(
+      "World_Imagery",
+      "Reference/World_Boundaries_and_Places",
+    ),
+  }),
+  "tiles-off": Object.freeze({
+    value: "tiles-off",
+    tiles: false,
+    className: "tiles-off",
+    detail: "Privacy mode · no external tiles",
+    layers: Object.freeze([]),
+  }),
+});
 
 export const nodeIsVisibleOnMap = (node) => node?.hidden_from_map !== true;
 
@@ -45,7 +133,9 @@ export const homeLocation = (hass) => {
 
 export const normalizeMapStyle = (value, legacyPrivacy = null) => {
   if (MAP_STYLE_VALUES.has(value)) return value;
-  return legacyPrivacy === "true" ? "tiles-off" : "neutral-dark";
+  if (value === "neutral-dark") return "esri-dark";
+  if (value === "standard") return "esri-streets";
+  return legacyPrivacy === "true" ? "tiles-off" : "esri-dark";
 };
 
 export const readMapStyle = (storage) =>
@@ -63,26 +153,7 @@ export const persistMapStyle = (storage, value) => {
 
 export const mapStylePresentation = (style) => {
   const value = normalizeMapStyle(style);
-  if (value === "standard")
-    return {
-      value,
-      tiles: true,
-      className: "standard-tiles",
-      detail: "Standard OpenStreetMap · © contributors",
-    };
-  if (value === "tiles-off")
-    return {
-      value,
-      tiles: false,
-      className: "tiles-off",
-      detail: "Privacy mode · no external tiles",
-    };
-  return {
-    value,
-    tiles: true,
-    className: "neutral-dark-tiles",
-    detail: "Near-black Neutral dark OpenStreetMap · © contributors",
-  };
+  return MAP_PRESENTATIONS[value];
 };
 
 export const mapCountLabel = (nodes, links, fixes) => {

@@ -159,12 +159,12 @@ def test_panel_is_authenticated_and_keeps_token_server_side() -> None:
     assert "meshmonitor.messages.pinned" in panel
     assert "meshmonitor.messages.muted" in panel
     assert 'localStorage.setItem("meshmonitor.messages.body"' not in panel
-    assert "neutral-dark-tiles" in panel
     assert "hue-rotate" not in panel
-    assert "tile.openstreetmap.org" in panel
-    assert "meshmonitor.map.style" in (
-        COMPONENT / "frontend" / "map-view.js"
-    ).read_text()
+    map_view = (COMPONENT / "frontend" / "map-view.js").read_text()
+    assert "esri-dark-tiles" in map_view
+    assert "tile.openstreetmap.org" not in map_view
+    assert "server.arcgisonline.com" in map_view
+    assert "meshmonitor.map.style" in map_view
     assert (COMPONENT / "frontend" / "vendor" / "leaflet" / "LICENSE").exists()
     assert 'vol.Required("type"): "meshmonitor/send_message"' in websocket
     assert "@require_admin" in websocket

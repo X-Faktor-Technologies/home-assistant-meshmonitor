@@ -142,12 +142,16 @@ Use **Map** to see current node positions and stored network relationships.
 
 ### Choose a map style
 
-- **Standard** uses normal OpenStreetMap tiles.
-- **Neutral Dark** shows the same map with a darker appearance.
+- **Dark gray** is the default and works well with dark Home Assistant themes.
+- **Light gray** provides a quiet, high-contrast light background.
+- **Streets** emphasizes roads and place names.
+- **Topographic** emphasizes terrain and land features.
+- **Satellite** uses aerial imagery with a reference-label overlay.
 - **Tiles off / privacy** shows markers and links without requesting map tiles.
 
-Standard and Neutral Dark contact the tile provider from your browser and can
-reveal the approximate map area being viewed.
+The Esri styles contact the tile provider from your browser and can reveal the
+approximate map area being viewed. If a tile provider fails, markers and stored
+links remain available and the footer asks you to choose another style.
 
 ### Map controls
 

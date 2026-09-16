@@ -119,11 +119,13 @@ tracker.
 Check the map style:
 
 - **Tiles off / privacy** intentionally shows no background tiles.
-- **Standard** and **Neutral Dark** require your browser to reach the
-  OpenStreetMap tile service.
+- **Dark gray**, **Light gray**, **Streets**, **Topographic**, and
+  **Satellite** require your browser to reach Esri's tile service.
 
 Browser privacy settings, DNS filters, and content blockers can stop tile
-requests. Nodes and saved links can still work in tile-free mode.
+requests. When this happens, the map footer reports that some tiles could not
+load. Select another style; nodes and saved links remain available even when
+the background provider is unavailable.
 
 ## A topology or neighbor layer has no links
 
