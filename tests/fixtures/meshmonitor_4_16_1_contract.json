@@ -1,0 +1,71 @@
+{
+  "version": "4.16.1",
+  "sourceId": "synthetic-source",
+  "sources": {
+    "sources": [
+      {
+        "id": "synthetic-source",
+        "name": "Synthetic Meshtastic",
+        "type": "meshtastic_tcp",
+        "enabled": true,
+        "observer": {
+          "connected": true,
+          "published": 42
+        }
+      }
+    ]
+  },
+  "status": {
+    "data": {
+      "connected": true,
+      "nodeResponsive": true,
+      "localNodeId": "!1234abcd",
+      "longName": "Synthetic Local",
+      "shortName": "SYN"
+    }
+  },
+  "nodesInitial": {
+    "nodes": [
+      {
+        "nodeId": 123456,
+        "longName": "Synthetic Remote",
+        "shortName": "REMOTE",
+        "lastHeard": 1770000000,
+        "snr": 7.5,
+        "rssi": -92,
+        "futureField": "retained"
+      }
+    ]
+  },
+  "nodesLater": {
+    "nodes": [
+      {
+        "nodeId": 123456,
+        "longName": "Synthetic Remote",
+        "shortName": "REMOTE",
+        "lastHeard": 1770000060,
+        "snr": 8.0,
+        "rssi": -90,
+        "futureField": "retained"
+      }
+    ]
+  },
+  "messages": {
+    "success": true,
+    "data": [
+      {
+        "id": "message_456",
+        "fromNodeId": "!0001e240",
+        "fromNodeLongName": "Synthetic Remote",
+        "toNodeId": "^all",
+        "channel": 0,
+        "channelName": "LongFast",
+        "text": "Synthetic 4.16.1 contract message",
+        "timestamp": 1770000060,
+        "rxTime": 1770000061,
+        "rxRssi": -90,
+        "rxSnr": 8.0
+      }
+    ]
+  }
+}

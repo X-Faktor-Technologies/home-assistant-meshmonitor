@@ -47,7 +47,7 @@ MeshMonitor panel without exposing a live network. See the
 ## What you need
 
 - Home Assistant 2026.8.0 or newer.
-- A MeshMonitor 4.14.x or 4.15.x server that Home Assistant can reach.
+- A MeshMonitor 4.14.x through 4.16.1 server that Home Assistant can reach.
 - At least one Meshtastic, MeshCore, or Reticulum source in MeshMonitor.
 - A dedicated MeshMonitor API user and token.
 
