@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Expose bounded, validated MeshCore route prefixes in received-message events
+  so Home Assistant automations can provide truthful path acknowledgements
+  without exposing the raw MeshMonitor response.
+
 ## 0.18.0-rc.1
 
 - Replace the blocked OpenStreetMap basemap with curated dark gray, light gray,

@@ -166,6 +166,79 @@ async def test_received_message_includes_available_sanitized_mesh_context(
     assert "raw" not in data
 
 
+async def test_meshcore_received_message_includes_sanitized_route_path(
+    hass: HomeAssistant,
+) -> None:
+    source = MessageSource(
+        Mock(),
+        "source-1",
+        "One",
+        "meshcore",
+        Mock(nodes={}, data=Mock(identity=Mock(destination_hash="local"))),
+        True,
+    )
+    coordinator = MeshMonitorMessageCoordinator(hass, (source,), "http://mesh.test")
+    events = []
+    hass.bus.async_listen(EVENT_MESSAGE_RECEIVED, events.append)
+    message = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "mc:source-1:path",
+            "fromPublicKey": "remote",
+            "toPublicKey": "channel-4",
+            "text": "Path",
+            "routePath": "0efa, b30c,9AE7,8e3c",
+            "receptions": [
+                {
+                    "sourceId": "source-1",
+                    "sourceType": "meshcore",
+                    "rxRssi": -54,
+                    "rxSnr": 8.75,
+                }
+            ],
+        }
+    )
+
+    coordinator._fire_received_event(message)
+    await hass.async_block_till_done()
+
+    assert events[0].data["route_path"] == ["0EFA", "B30C", "9AE7", "8E3C"]
+    assert events[0].data["text"] == "Path"
+    assert "raw" not in events[0].data
+
+
+@pytest.mark.parametrize(
+    "route_path",
+    ["0efa,not-a-hash", "0efa," + ",".join(["1234"] * 16), {"bad": "shape"}],
+)
+async def test_meshcore_received_message_omits_invalid_route_path(
+    hass: HomeAssistant, route_path: object
+) -> None:
+    source = MessageSource(
+        Mock(),
+        "source-1",
+        "One",
+        "meshcore",
+        Mock(nodes={}, data=Mock(identity=Mock(destination_hash="local"))),
+    )
+    coordinator = MeshMonitorMessageCoordinator(hass, (source,), "http://mesh.test")
+    events = []
+    hass.bus.async_listen(EVENT_MESSAGE_RECEIVED, events.append)
+    message = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "mc:source-1:invalid-path",
+            "fromPublicKey": "remote",
+            "toPublicKey": "channel-4",
+            "routePath": route_path,
+            "receptions": [{"sourceId": "source-1", "sourceType": "meshcore"}],
+        }
+    )
+
+    coordinator._fire_received_event(message)
+    await hass.async_block_till_done()
+
+    assert "route_path" not in events[0].data
+
+
 async def test_message_poll_interval_is_configurable(hass: HomeAssistant) -> None:
     coordinator = MeshMonitorMessageCoordinator(
         hass, (), "http://mesh.test", timedelta(seconds=75)

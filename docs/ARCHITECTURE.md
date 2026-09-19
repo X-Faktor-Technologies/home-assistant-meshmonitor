@@ -133,7 +133,9 @@ message bodies. On first setup it baselines the returned history, and after a
 restart it restores the ID cursor, so old messages are not replayed as new
 events. Outgoing messages are excluded from received-message events.
 
-`meshmonitor_message_received` contains routing and identity metadata. Message
+`meshmonitor_message_received` contains routing and identity metadata. MeshCore
+events include a bounded, normalized `route_path` only when the stored message
+contains a valid route; the raw server response remains private. Message
 text is added only when a matching reception's exact source enables the
 text-in-events privacy option. The panel's authenticated conversation view can
 show message text independently of that event option. Pins, mutes, filters,
