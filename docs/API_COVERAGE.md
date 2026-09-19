@@ -5,9 +5,9 @@ questions: which MeshMonitor features are supported, which permissions they
 need, and which features intentionally stay in MeshMonitor instead of Home
 Assistant.
 
-The matrix was last audited on 2026-09-03 against MeshMonitor 4.15.2, the
+The matrix was last audited on 2026-09-19 against MeshMonitor 4.16.1, the
 current stable upstream release. The integration supports MeshMonitor 4.14.x
-and 4.15.x. Upstream `main` is monitored for compatibility planning but is
+through 4.16.1. Upstream `main` is monitored for compatibility planning but is
 not a supported contract until those changes appear in a stable release.
 
 ## What the operation types mean
@@ -61,12 +61,12 @@ directly.
 
 ## Compatibility watch
 
-MeshMonitor 4.15.2 adds Mesh Issues reporting, Device Health automation types,
-per-source MeshCore path-hash settings, and MeshCore neighbor polling and age
-data. Static route comparison found no removed or renamed API route currently
-used by the integration. The existing read-only and messaging surfaces remain
-compatible, including the explicitly configured per-source path-hash setting
-owned by MeshMonitor.
+MeshMonitor 4.16.1 preserves the source, status, node, source-scoped message,
+Reticulum, and automation routes consumed by the integration. Its
+cross-source message-permission repair applies to legacy/global reads; this
+integration already uses source-scoped and protocol-specific message methods.
+The deterministic `meshmonitor_4_16_1_contract.json` fixture records the
+stable response shapes without production data.
 
 The leading enhancement candidates are a compact read-only Mesh Issues summary
 and typed MeshCore neighbor-age visibility. Device Health automation types can
@@ -75,9 +75,16 @@ shape is covered. Path-hash writes, neighbor polling, firmware, restore,
 scripts, and other server or radio administration remain in MeshMonitor unless
 a separate reviewed Home Assistant use case justifies changing that boundary.
 
-The known stale MeshCore contact timestamp behavior is not corrected by
-MeshMonitor 4.15.2. The integration must continue to avoid presenting that
-timestamp as reliable current activity until the upstream contract changes.
+MeshMonitor 4.16.1 updates MeshCore `lastHeard` on every receive path and
+prevents an older contact timestamp from moving it backward. The integration
+continues to use that server value directly. The local MeshCore identity is
+still treated separately because a radio cannot RF-hear itself.
+
+The vendored client is reviewed against the standalone
+`python-meshmonitor` package. Models, exceptions, and request behavior remain
+synchronized. The embedded package intentionally omits only distribution
+metadata lookup and its public `__version__`, because it is shipped inside the
+Home Assistant integration rather than installed as a Python distribution.
 
 ## Release lanes
 

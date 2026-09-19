@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Declare MeshMonitor 4.16.1 compatibility and add a deterministic synthetic
+  contract fixture covering source discovery, status, nodes, source-scoped
+  messages, and the upstream forward-only `lastHeard` invariant.
+- Document the reviewed standalone/vendored client relationship. The embedded
+  package intentionally omits distribution-version lookup; runtime models,
+  exceptions, and request behavior remain synchronized.
+
 ## 0.17.1
 
 - Fixed README images in HACS by using absolute public image URLs pinned to a
