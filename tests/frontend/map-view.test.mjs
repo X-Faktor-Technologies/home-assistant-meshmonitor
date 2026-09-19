@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  MAP_STYLES,
   MAP_STYLE_STORAGE,
   MAP_SHOW_HOME_STORAGE,
   homeLocation,
@@ -76,7 +77,7 @@ test("map layer summaries retain empty, unavailable, and partial-failure states"
   );
 });
 
-test("map styles retain a neutral default and migrate legacy privacy mode", () => {
+test("map styles default to dark gray and migrate legacy preferences", () => {
   const values = new Map();
   const storage = {
     getItem: (key) => values.get(key) ?? null,
@@ -84,27 +85,62 @@ test("map styles retain a neutral default and migrate legacy privacy mode", () =
     removeItem: (key) => values.delete(key),
   };
 
-  assert.equal(readMapStyle(storage), "neutral-dark");
+  assert.equal(readMapStyle(storage), "esri-dark");
   values.set("meshmonitor.map.privacy", "true");
   assert.equal(readMapStyle(storage), "tiles-off");
-  assert.equal(persistMapStyle(storage, "standard"), "standard");
-  assert.equal(values.get(MAP_STYLE_STORAGE), "standard");
+  assert.equal(persistMapStyle(storage, "esri-streets"), "esri-streets");
+  assert.equal(values.get(MAP_STYLE_STORAGE), "esri-streets");
   assert.equal(values.has("meshmonitor.map.privacy"), false);
-  assert.equal(readMapStyle(storage), "standard");
+  assert.equal(readMapStyle(storage), "esri-streets");
+  values.set(MAP_STYLE_STORAGE, "neutral-dark");
+  assert.equal(readMapStyle(storage), "esri-dark");
+  values.set(MAP_STYLE_STORAGE, "standard");
+  assert.equal(readMapStyle(storage), "esri-streets");
 });
 
-test("map style presentation enables tiles only for the two tile styles", () => {
-  assert.deepEqual(mapStylePresentation("standard"), {
-    value: "standard",
-    tiles: true,
-    className: "standard-tiles",
-    detail: "Standard OpenStreetMap · © contributors",
-  });
-  assert.equal(mapStylePresentation("neutral-dark").tiles, true);
-  assert.equal(mapStylePresentation("neutral-dark").className, "neutral-dark-tiles");
-  assert.match(mapStylePresentation("neutral-dark").detail, /Near-black/);
+test("map styles provide curated keyless tile layers and preserve privacy mode", () => {
+  assert.deepEqual(
+    MAP_STYLES.map(({ value }) => value),
+    [
+      "esri-dark",
+      "esri-light",
+      "esri-streets",
+      "esri-topographic",
+      "esri-satellite",
+      "tiles-off",
+    ],
+  );
+  const dark = mapStylePresentation("esri-dark");
+  assert.equal(dark.tiles, true);
+  assert.equal(dark.className, "esri-dark-tiles");
+  assert.equal(dark.layers.length, 2);
+  assert.match(dark.layers[0].url, /World_Dark_Gray_Base/);
+  assert.match(dark.layers[1].url, /World_Dark_Gray_Reference/);
+
+  const satellite = mapStylePresentation("esri-satellite");
+  assert.equal(satellite.layers.length, 2);
+  assert.match(satellite.layers[0].url, /World_Imagery/);
+  assert.match(satellite.layers[1].url, /World_Boundaries_and_Places/);
+
+  for (const { value } of MAP_STYLES.filter(({ value }) => value !== "tiles-off")) {
+    const presentation = mapStylePresentation(value);
+    assert.ok(presentation.layers.length >= 1);
+    assert.match(
+      presentation.layers[0].url,
+      /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\//,
+    );
+    assert.match(presentation.layers[0].options.attribution, /Esri/);
+    for (const layer of presentation.layers) {
+      assert.equal(layer.options.maxZoom, 19);
+      assert.doesNotMatch(layer.url, /\?|\{s\}/);
+    }
+  }
+
   assert.equal(mapStylePresentation("tiles-off").tiles, false);
-  assert.equal(mapStylePresentation("invalid").value, "neutral-dark");
+  assert.deepEqual(mapStylePresentation("tiles-off").layers, []);
+  assert.equal(mapStylePresentation("neutral-dark").value, "esri-dark");
+  assert.equal(mapStylePresentation("standard").value, "esri-streets");
+  assert.equal(mapStylePresentation("invalid").value, "esri-dark");
 });
 
 test("home visibility is off by default and persists in browser storage", () => {
@@ -186,6 +222,18 @@ test("map controls use theme-neutral surfaces and balanced mobile grids", () => 
   assert.match(panel, /\.map-control-group\.layers\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/);
   assert.match(panel, /\.map-control-group\.layers #map-show-home\{grid-column:1\/-1\}/);
   assert.match(panel, /\.map-control-group\.view\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) 44px minmax\(110px,1\.25fr\)\}/);
+});
+
+test("map tile failures preserve overlays and direct users to another style", () => {
+  const panel = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(panel, /for \(const layer of mapStyle\.layers\)/);
+  assert.match(panel, /tiles\.on\("tileerror"/);
+  assert.match(panel, /Some map tiles could not load; choose another style/);
+  assert.match(panel, /class="map-tile-state muted" role="status" aria-live="polite"/);
 });
 
 test("map node popup opens the matching panel node details instead of MeshMonitor", () => {

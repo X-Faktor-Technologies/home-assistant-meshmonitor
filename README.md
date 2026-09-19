@@ -20,7 +20,8 @@ Back up Home Assistant before installing or upgrading a custom integration.
 - A clear overview of connected sources, active nodes, positions, and recent
   activity.
 - Searchable node and conversation views.
-- A combined map with Standard, Neutral Dark, and tile-free privacy styles.
+- A combined map with dark, light, streets, topographic, satellite, and
+  tile-free privacy styles.
 - Home Assistant devices, sensors, and optional GPS trackers.
 - Events, device triggers, actions, and ready-to-import automation blueprints.
 - Optional favorites and message sending, disabled until you turn them on.
@@ -197,15 +198,18 @@ transmit airtime, hop count, and an optional GPS tracker.
 MeshMonitor does not guess missing values. If a radio does not report a value,
 the matching entity is left out or shown as unavailable.
 
-### Map privacy
+### Map styles and privacy
 
-- **Standard** uses normal OpenStreetMap tiles.
-- **Neutral Dark** uses the same tiles with a dark visual treatment.
+- **Dark gray** is the default and is designed for dark dashboards.
+- **Light gray**, **Streets**, **Topographic**, and **Satellite** provide
+  alternate Esri basemaps.
 - **Tiles off / privacy** shows nodes and links without contacting a map tile
   provider.
 
-Standard and Neutral Dark send tile requests from your browser. Those requests
-can reveal the approximate area being viewed to the tile provider.
+Every tiled style sends requests from your browser to its named provider.
+Those requests can reveal the approximate area being viewed. If a provider is
+blocked or unavailable, the panel keeps the mesh overlays visible and prompts
+you to select another style.
 
 ### Automations
 

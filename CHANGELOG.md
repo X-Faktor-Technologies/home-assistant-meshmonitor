@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Replace the blocked OpenStreetMap basemap with curated dark gray, light gray,
+  streets, topographic, and satellite choices; retain tile-free privacy mode
+  and report tile-provider failures without hiding mesh markers or links.
 - Declare MeshMonitor 4.16.1 compatibility and add a deterministic synthetic
   contract fixture covering source discovery, status, nodes, source-scoped
   messages, and the upstream forward-only `lastHeard` invariant.

@@ -143,12 +143,10 @@ the same browser profile, browser extensions, screenshots, developer tools,
 and a compromised browser are inside this boundary. Clear Home Assistant site
 data when a shared browser profile changes hands.
 
-With the Standard or Neutral dark Map style, the browser sends tile coordinates
-and ordinary request metadata to the configured OpenStreetMap tile service.
-Those requests can reveal the client's network address, timing, and approximate
-viewed area. **Tiles off / privacy** prevents the panel from making external
-tile requests; the visual filter choice does not change the tile provider or
-send data anywhere else.
+With any tiled Map style, the browser sends tile coordinates and ordinary
+request metadata to Esri. Those requests can reveal the client's network
+address, timing, and approximate viewed area. **Tiles off / privacy** prevents
+the panel from making external tile requests.
 
 Direct links disclose a deliberate navigation to the configured MeshMonitor
 origin. The generated links strip URL user information, query data, and
