@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.18.0-rc.1
+
 - Replace the blocked OpenStreetMap basemap with curated dark gray, light gray,
   streets, topographic, and satellite choices; retain tile-free privacy mode
   and report tile-provider failures without hiding mesh markers or links.
