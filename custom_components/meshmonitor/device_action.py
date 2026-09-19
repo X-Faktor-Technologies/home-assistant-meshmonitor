@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 ATTR_DESTINATION_NODE_ID = "destination_node_id"
 ATTR_CHANNEL = "channel"
 ATTR_TEXT = "text"
+MAX_TEMPLATE_SOURCE_LENGTH = 4096
 
 ACTION_SEND_DIRECT_TO_KNOWN_NODE = "send_direct_message_to_known_node"
 ACTION_SEND_TO_KNOWN_CHANNEL = "send_channel_message_to_known_channel"
@@ -55,14 +56,20 @@ ACTION_SCHEMA = vol.Any(
         {
             vol.Required(CONF_TYPE): vol.In({ACTION_SEND_DIRECT_TO_KNOWN_NODE}),
             vol.Required(ATTR_DESTINATION_NODE_ID): cv.string,
-            vol.Required(ATTR_TEXT): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Required(ATTR_TEXT): vol.All(
+                str,
+                vol.Length(min=1, max=MAX_TEMPLATE_SOURCE_LENGTH),
+            ),
         }
     ),
     cv.DEVICE_ACTION_BASE_SCHEMA.extend(
         {
             vol.Required(CONF_TYPE): vol.In({ACTION_SEND_TO_KNOWN_CHANNEL}),
             vol.Required(ATTR_CHANNEL): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
-            vol.Required(ATTR_TEXT): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Required(ATTR_TEXT): vol.All(
+                str,
+                vol.Length(min=1, max=MAX_TEMPLATE_SOURCE_LENGTH),
+            ),
         }
     ),
     cv.DEVICE_ACTION_BASE_SCHEMA.extend(

@@ -6,8 +6,8 @@
   so Home Assistant automations can provide truthful path acknowledgements
   without exposing the raw MeshMonitor response.
 - Render Home Assistant templates in visual direct-message and channel-message
-  device actions before passing the resulting text through the existing guarded
-  MeshMonitor send services.
+  device actions, allow bounded template sources longer than final radio
+  payloads, and pass only rendered text through the guarded send services.
 - Attach visual MeshMonitor device triggers from their stable source-device
   identity so Home Assistant automation startup no longer races integration
   runtime loading after a restart.

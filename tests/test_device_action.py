@@ -33,6 +33,7 @@ from custom_components.meshmonitor.device_action import (
     ACTION_REQUEST_NODEINFO,
     ACTION_REQUEST_POSITION,
     ACTION_REQUEST_TRACEROUTE,
+    ACTION_SCHEMA,
     ACTION_SEND_DIRECT_TO_KNOWN_NODE,
     ACTION_SEND_TO_KNOWN_CHANNEL,
     ACTION_UNFAVORITE_NODE,
@@ -260,15 +261,24 @@ async def test_dynamic_action_uses_guarded_service_contract(
     )
     async_register_actions(hass)
 
-    await async_call_action_from_config(
-        hass,
+    template = (
+        "{% set harmless_padding = '"
+        + ("x" * 220)
+        + "' %}ACK {{ trigger.event.data.sender_name }}"
+    )
+    config = ACTION_SCHEMA(
         {
             CONF_DEVICE_ID: source_device_id,
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_SEND_DIRECT_TO_KNOWN_NODE,
             ATTR_DESTINATION_NODE_ID: "!1234abcd",
-            "text": "ACK {{ trigger.event.data.sender_name }}",
-        },
+            "text": template,
+        }
+    )
+
+    await async_call_action_from_config(
+        hass,
+        config,
         {"trigger": {"event": {"data": {"sender_name": "Remote Alpha"}}}},
         None,
     )
