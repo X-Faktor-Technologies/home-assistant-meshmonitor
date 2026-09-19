@@ -103,7 +103,7 @@ async def async_attach_trigger(
     config = TRIGGER_SCHEMA(config)
     source_id = _source_id_for_device(hass, config[CONF_DEVICE_ID])
     if source_id is None:
-        raise vol.Invalid("The selected device is not a loaded MeshMonitor source")
+        raise vol.Invalid("The selected device is not a MeshMonitor source")
     trigger_type = config[CONF_TYPE]
     trigger_data = trigger_info["trigger_data"]
     job = HassJob(action, f"MeshMonitor {trigger_type} device trigger")
@@ -343,9 +343,17 @@ def _message_filters_match(config: ConfigType, event: Event) -> bool:
 
 
 def _source_id_for_device(hass: HomeAssistant, device_id: str) -> str | None:
-    """Resolve a loaded source device without exposing the server fingerprint."""
-    source = _source_for_device(hass, device_id)
-    return source.source_id if source is not None else None
+    """Resolve a stable source ID without depending on runtime load order."""
+    device = dr.async_get(hass).async_get(device_id)
+    if device is None:
+        return None
+    for domain, identifier in device.identifiers:
+        if domain != DOMAIN or not identifier.startswith("source:"):
+            continue
+        parts = identifier.split(":", 2)
+        if len(parts) == 3 and parts[1] and parts[2]:
+            return parts[2]
+    return None
 
 
 def _source_for_device(hass: HomeAssistant, device_id: str) -> Any | None:

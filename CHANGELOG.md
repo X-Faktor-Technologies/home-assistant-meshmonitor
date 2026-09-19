@@ -8,6 +8,9 @@
 - Render Home Assistant templates in visual direct-message and channel-message
   device actions before passing the resulting text through the existing guarded
   MeshMonitor send services.
+- Attach visual MeshMonitor device triggers from their stable source-device
+  identity so Home Assistant automation startup no longer races integration
+  runtime loading after a restart.
 
 ## 0.18.0-rc.1
 
