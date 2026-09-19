@@ -11,6 +11,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import selector
+from homeassistant.helpers.template import Template
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_ENABLE_NODE_MANAGEMENT, DOMAIN, SOURCE_TYPE_MESHCORE
@@ -236,13 +237,17 @@ async def async_call_action_from_config(
         from .actions import ATTR_CHANNEL as SERVICE_ATTR_CHANNEL
         from .actions import ATTR_SOURCE_DEVICE_ID, SERVICE_SEND_CHANNEL_MESSAGE
 
+        text = Template(config[ATTR_TEXT], hass).async_render(
+            variables,
+            parse_result=False,
+        )
         await hass.services.async_call(
             DOMAIN,
             SERVICE_SEND_CHANNEL_MESSAGE,
             {
                 ATTR_SOURCE_DEVICE_ID: config[CONF_DEVICE_ID],
                 SERVICE_ATTR_CHANNEL: channel,
-                ATTR_TEXT: config[ATTR_TEXT],
+                ATTR_TEXT: text,
             },
             blocking=True,
             context=context,
@@ -277,13 +282,17 @@ async def async_call_action_from_config(
         return
     from .actions import ATTR_RECIPIENT, ATTR_SOURCE_DEVICE_ID, SERVICE_SEND_DIRECT_MESSAGE
 
+    text = Template(config[ATTR_TEXT], hass).async_render(
+        variables,
+        parse_result=False,
+    )
     await hass.services.async_call(
         DOMAIN,
         SERVICE_SEND_DIRECT_MESSAGE,
         {
             ATTR_SOURCE_DEVICE_ID: config[CONF_DEVICE_ID],
             ATTR_RECIPIENT: destination,
-            ATTR_TEXT: config[ATTR_TEXT],
+            ATTR_TEXT: text,
         },
         blocking=True,
         context=context,

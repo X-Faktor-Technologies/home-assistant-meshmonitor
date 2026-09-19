@@ -267,14 +267,14 @@ async def test_dynamic_action_uses_guarded_service_contract(
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_SEND_DIRECT_TO_KNOWN_NODE,
             ATTR_DESTINATION_NODE_ID: "!1234abcd",
-            "text": "dynamic destination",
+            "text": "ACK {{ trigger.event.data.sender_name }}",
         },
-        {},
+        {"trigger": {"event": {"data": {"sender_name": "Remote Alpha"}}}},
         None,
     )
 
     source.client.send_meshtastic_message.assert_awaited_once_with(
-        "meshtastic-a", "dynamic destination", to_node_id="!1234abcd"
+        "meshtastic-a", "ACK Remote Alpha", to_node_id="!1234abcd"
     )
 
 
@@ -401,13 +401,13 @@ async def test_channel_capabilities_and_action_use_exact_source_inventory(
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_SEND_TO_KNOWN_CHANNEL,
             ATTR_CHANNEL: 2,
-            "text": "channel destination",
+            "text": "heard {{ trigger.event.data.sender_name }}",
         },
-        {},
+        {"trigger": {"event": {"data": {"sender_name": "Remote Beta"}}}},
         None,
     )
     source.client.send_meshtastic_message.assert_awaited_once_with(
-        "meshtastic-a", "channel destination", channel=2
+        "meshtastic-a", "heard Remote Beta", channel=2
     )
 
 

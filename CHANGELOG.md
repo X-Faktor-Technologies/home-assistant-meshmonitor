@@ -5,6 +5,9 @@
 - Expose bounded, validated MeshCore route prefixes in received-message events
   so Home Assistant automations can provide truthful path acknowledgements
   without exposing the raw MeshMonitor response.
+- Render Home Assistant templates in visual direct-message and channel-message
+  device actions before passing the resulting text through the existing guarded
+  MeshMonitor send services.
 
 ## 0.18.0-rc.1
 
