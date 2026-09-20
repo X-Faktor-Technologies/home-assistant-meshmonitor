@@ -9,6 +9,9 @@
 - Render Home Assistant templates in visual direct-message and channel-message
   device actions, allow bounded template sources longer than final radio
   payloads, and pass only rendered text through the guarded send services.
+- Keep accepted outgoing messages optimistic until the normal background poll
+  reconciles stored history, avoiding a redundant post-send panel refresh that
+  could move the Messages timeline away from the latest message.
 - Attach visual MeshMonitor device triggers from their stable source-device
   identity so Home Assistant automation startup no longer races integration
   runtime loading after a restart.

@@ -317,6 +317,67 @@ test("radio-backed sends await MeshMonitor and preserve its acceptance state", (
   );
 });
 
+test("accepted sends update optimistically without an immediate panel refresh", async () => {
+  const panelSource = readFileSync(
+    new URL("../../custom_components/meshmonitor/frontend/meshmonitor-panel.js", import.meta.url),
+    "utf8",
+  )
+    .replace(/^import[\s\S]*?;\n/gm, "")
+    .replace(/if \(!customElements\.get[\s\S]*$/m, "")
+    .replace(
+      "class MeshMonitorPanel extends HTMLElement",
+      "globalThis.MeshMonitorPanel = class MeshMonitorPanel extends HTMLElement",
+    );
+  const context = {
+    HTMLElement: class {},
+    conversationSourceChoices,
+    messageDraftValidation,
+    messageSendNonce: () => "synthetic-send-nonce",
+    sendErrorPresentation,
+  };
+  vm.runInNewContext(panelSource, context);
+
+  const source = {
+    ...SOURCE,
+    fetched_at: new Date().toISOString(),
+  };
+  const panel = Object.create(context.MeshMonitorPanel.prototype);
+  panel._data = { sources: [source], messages: [] };
+  panel._conversation = "channel:meshtastic:0";
+  panel._composeSource = "entry-1|source-1";
+  panel._composeText = "Keep the timeline anchored";
+  panel._messageDrafts = new Map([[panel._conversation, panel._composeText]]);
+  panel._pendingMessages = [];
+  panel._replyContext = null;
+  panel._sending = false;
+  panel._conversationCatalog = () => [{
+    key: panel._conversation,
+    type: "channel",
+    protocol: "meshtastic",
+    channel: 0,
+  }];
+  const requests = [];
+  panel._hass = {
+    callWS: async (request) => {
+      requests.push(request);
+      return { accepted: true, delivery_state: "sent" };
+    },
+  };
+  let renderCount = 0;
+  panel._render = () => { renderCount += 1; };
+
+  await panel._sendMessage();
+
+  assert.equal(requests.length, 1, "send must not trigger a second panel fetch");
+  assert.equal(requests[0].type, "meshmonitor/send_message");
+  assert.equal(renderCount, 2, "render only the optimistic and settled send states");
+  assert.equal(panel._pendingMessages[0].state, "accepted");
+  assert.equal(panel._pendingMessages[0].deliveryState, "sent");
+  assert.equal(panel._sending, false);
+  assert.equal(panel._composeText, "");
+  assert.equal(panel._forceMessageScrollToBottom, true);
+});
+
 test("timeline presentation keeps provenance compact and deterministic", () => {
   const presentation = messagePresentation(
     {
