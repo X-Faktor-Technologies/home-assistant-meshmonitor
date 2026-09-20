@@ -169,12 +169,34 @@ async def test_received_message_includes_available_sanitized_mesh_context(
 async def test_meshcore_received_message_includes_sanitized_route_path(
     hass: HomeAssistant,
 ) -> None:
+    route_nodes = {
+        "0efa" + "0" * 60: SimpleNamespace(
+            id="0efa" + "0" * 60,
+            long_name="First Repeater",
+            short_name=None,
+        ),
+        "b30c" + "1" * 60: SimpleNamespace(
+            id="b30c" + "1" * 60,
+            long_name="Second Repeater",
+            short_name=None,
+        ),
+        "9ae7" + "2" * 60: SimpleNamespace(
+            id="9ae7" + "2" * 60,
+            long_name="lvmesh.com GH k3ntr",
+            short_name=None,
+        ),
+        "8e3c" + "3" * 60: SimpleNamespace(
+            id="8e3c" + "3" * 60,
+            long_name=None,
+            short_name=None,
+        ),
+    }
     source = MessageSource(
         Mock(),
         "source-1",
         "One",
         "meshcore",
-        Mock(nodes={}, data=Mock(identity=Mock(destination_hash="local"))),
+        Mock(nodes=route_nodes, data=Mock(identity=Mock(destination_hash="local"))),
         True,
     )
     coordinator = MeshMonitorMessageCoordinator(hass, (source,), "http://mesh.test")
@@ -202,8 +224,81 @@ async def test_meshcore_received_message_includes_sanitized_route_path(
     await hass.async_block_till_done()
 
     assert events[0].data["route_path"] == ["0EFA", "B30C", "9AE7", "8E3C"]
+    assert events[0].data["route_hops"] == [
+        {"hash": "0EFA", "name": "First Repeater"},
+        {"hash": "B30C", "name": "Second Repeater"},
+        {"hash": "9AE7", "name": "lvmesh.com GH k3ntr"},
+        {"hash": "8E3C", "name": None},
+    ]
     assert events[0].data["text"] == "Path"
     assert "raw" not in events[0].data
+
+
+async def test_meshcore_route_names_are_source_scoped_and_unambiguous(
+    hass: HomeAssistant,
+) -> None:
+    route_prefix = "9ae7"
+    matching_source = MessageSource(
+        Mock(),
+        "source-1",
+        "One",
+        "meshcore",
+        Mock(
+            nodes={
+                route_prefix + "0" * 60: SimpleNamespace(
+                    id=route_prefix + "0" * 60,
+                    long_name="First match",
+                    short_name=None,
+                ),
+                route_prefix + "1" * 60: SimpleNamespace(
+                    id=route_prefix + "1" * 60,
+                    long_name="Second match",
+                    short_name=None,
+                ),
+            },
+            data=Mock(identity=Mock(destination_hash="local")),
+        ),
+        True,
+    )
+    other_source = MessageSource(
+        Mock(),
+        "source-2",
+        "Two",
+        "meshcore",
+        Mock(
+            nodes={
+                route_prefix + "2" * 60: SimpleNamespace(
+                    id=route_prefix + "2" * 60,
+                    long_name="Other source",
+                    short_name=None,
+                )
+            },
+            data=Mock(identity=Mock(destination_hash="other-local")),
+        ),
+        True,
+    )
+    coordinator = MeshMonitorMessageCoordinator(
+        hass, (matching_source, other_source), "http://mesh.test"
+    )
+    events = []
+    hass.bus.async_listen(EVENT_MESSAGE_RECEIVED, events.append)
+    message = UnifiedMessage.from_dict(
+        {
+            "dedupKey": "mc:source-1:ambiguous-path",
+            "fromPublicKey": "remote",
+            "toPublicKey": "channel-4",
+            "text": "Path",
+            "routePath": route_prefix,
+            "receptions": [
+                {"sourceId": "source-1", "sourceType": "meshcore"}
+            ],
+        }
+    )
+
+    coordinator._fire_received_event(message)
+    await hass.async_block_till_done()
+
+    assert events[0].data["route_hops"] == [{"hash": "9AE7", "name": None}]
 
 
 @pytest.mark.parametrize(
@@ -237,6 +332,7 @@ async def test_meshcore_received_message_omits_invalid_route_path(
     await hass.async_block_till_done()
 
     assert "route_path" not in events[0].data
+    assert "route_hops" not in events[0].data
 
 
 async def test_message_poll_interval_is_configurable(hass: HomeAssistant) -> None:
