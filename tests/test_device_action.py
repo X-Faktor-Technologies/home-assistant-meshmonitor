@@ -33,6 +33,7 @@ from custom_components.meshmonitor.device_action import (
     ACTION_REQUEST_NODEINFO,
     ACTION_REQUEST_POSITION,
     ACTION_REQUEST_TRACEROUTE,
+    ACTION_SCHEMA,
     ACTION_SEND_DIRECT_TO_KNOWN_NODE,
     ACTION_SEND_TO_KNOWN_CHANNEL,
     ACTION_UNFAVORITE_NODE,
@@ -260,21 +261,30 @@ async def test_dynamic_action_uses_guarded_service_contract(
     )
     async_register_actions(hass)
 
-    await async_call_action_from_config(
-        hass,
+    template = (
+        "{% set harmless_padding = '"
+        + ("x" * 220)
+        + "' %}ACK {{ trigger.event.data.sender_name }}"
+    )
+    config = ACTION_SCHEMA(
         {
             CONF_DEVICE_ID: source_device_id,
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_SEND_DIRECT_TO_KNOWN_NODE,
             ATTR_DESTINATION_NODE_ID: "!1234abcd",
-            "text": "dynamic destination",
-        },
-        {},
+            "text": template,
+        }
+    )
+
+    await async_call_action_from_config(
+        hass,
+        config,
+        {"trigger": {"event": {"data": {"sender_name": "Remote Alpha"}}}},
         None,
     )
 
     source.client.send_meshtastic_message.assert_awaited_once_with(
-        "meshtastic-a", "dynamic destination", to_node_id="!1234abcd"
+        "meshtastic-a", "ACK Remote Alpha", to_node_id="!1234abcd"
     )
 
 
@@ -401,13 +411,13 @@ async def test_channel_capabilities_and_action_use_exact_source_inventory(
             CONF_DOMAIN: DOMAIN,
             CONF_TYPE: ACTION_SEND_TO_KNOWN_CHANNEL,
             ATTR_CHANNEL: 2,
-            "text": "channel destination",
+            "text": "heard {{ trigger.event.data.sender_name }}",
         },
-        {},
+        {"trigger": {"event": {"data": {"sender_name": "Remote Beta"}}}},
         None,
     )
     source.client.send_meshtastic_message.assert_awaited_once_with(
-        "meshtastic-a", "channel destination", channel=2
+        "meshtastic-a", "heard Remote Beta", channel=2
     )
 
 

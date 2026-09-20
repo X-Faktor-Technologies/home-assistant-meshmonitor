@@ -318,6 +318,11 @@ def _message_mesh_context(
         "sender_longitude": sender_node.longitude if sender_node is not None else None,
         "sender_altitude": sender_node.altitude if sender_node is not None else None,
     }
+    if message.protocol == SOURCE_TYPE_MESHCORE:
+        route_path = _meshcore_route_path(message.raw)
+        values["route_path"] = route_path
+        if route_path is not None:
+            values["route_hops"] = _meshcore_route_hops(route_path, matching_sources)
     reticulum = message.raw.get("reticulum")
     if isinstance(reticulum, Mapping):
         values.update(
@@ -343,6 +348,60 @@ def _optional_int(value: Any) -> int | None:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _meshcore_route_path(raw: Mapping[str, Any]) -> list[str] | None:
+    """Return one bounded, normalized MeshCore route without exposing raw data."""
+    value = raw.get("routePath", raw.get("route_path"))
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+    elif isinstance(value, (list, tuple)):
+        parts = [str(part).strip() for part in value if str(part).strip()]
+    else:
+        return None
+    if not parts or len(parts) > 16:
+        return None
+    if any(
+        len(part) not in {2, 4, 6}
+        or any(character not in "0123456789abcdefABCDEF" for character in part)
+        for part in parts
+    ):
+        return None
+    return [part.upper() for part in parts]
+
+
+def _meshcore_route_hops(
+    route_path: list[str], sources: list[MessageSource]
+) -> list[dict[str, str | None]]:
+    """Resolve route prefixes only against the exact receiving source inventory."""
+    nodes: dict[str, Any] = {}
+    for source in sources:
+        if source.source_type != SOURCE_TYPE_MESHCORE:
+            continue
+        source_nodes = getattr(source.coordinator, "nodes", {})
+        if not isinstance(source_nodes, Mapping):
+            continue
+        for node in source_nodes.values():
+            node_id = _normalize_id(getattr(node, "id", None))
+            if node_id:
+                nodes.setdefault(node_id, node)
+
+    resolved: list[dict[str, str | None]] = []
+    for route_hash in route_path:
+        matches = [
+            node
+            for node_id, node in nodes.items()
+            if node_id.startswith(route_hash.lower())
+        ]
+        name = None
+        if len(matches) == 1:
+            candidate = getattr(matches[0], "long_name", None) or getattr(
+                matches[0], "short_name", None
+            )
+            if isinstance(candidate, str) and candidate.strip():
+                name = candidate.strip()
+        resolved.append({"hash": route_hash, "name": name})
+    return resolved
 
 
 def _packet_hop_count(raw: Mapping[str, Any]) -> int | None:

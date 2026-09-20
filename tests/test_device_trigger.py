@@ -127,6 +127,44 @@ async def test_only_source_devices_offer_received_message_triggers(
 
 
 @pytest.mark.asyncio
+async def test_trigger_attaches_before_source_runtime_is_loaded(
+    hass: HomeAssistant,
+) -> None:
+    """Automation setup must not race MeshMonitor config-entry startup."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_URL: "http://mesh.invalid", "sources": []},
+    )
+    entry.add_to_hass(hass)
+    fingerprint = server_fingerprint(entry.data[CONF_URL])
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={source_device_identifier(fingerprint, "source-a")},
+    )
+    action = AsyncMock()
+
+    remove = await async_attach_trigger(
+        hass,
+        {
+            CONF_PLATFORM: "device",
+            CONF_DOMAIN: DOMAIN,
+            CONF_DEVICE_ID: source_device.id,
+            CONF_TYPE: TRIGGER_DIRECT_MESSAGE,
+        },
+        action,
+        {"trigger_data": {}, "variables": {}},
+    )
+    hass.bus.async_fire(
+        EVENT_MESSAGE_RECEIVED,
+        {"source_ids": ["source-a"], "is_direct": True, "text": "early message"},
+    )
+    await hass.async_block_till_done()
+
+    action.assert_awaited_once()
+    remove()
+
+
+@pytest.mark.asyncio
 async def test_direct_trigger_filters_source_and_message_kind(hass: HomeAssistant) -> None:
     source_device_id, _ = _devices(hass)
     action = AsyncMock()

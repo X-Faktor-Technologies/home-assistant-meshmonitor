@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.18.0-rc.2
+
+- Expose bounded, validated MeshCore route prefixes and source-scoped friendly
+  hop names in received-message events so Home Assistant automations can
+  provide truthful path acknowledgements without exposing the raw MeshMonitor
+  response or making additional API requests.
+- Render Home Assistant templates in visual direct-message and channel-message
+  device actions, allow bounded template sources longer than final radio
+  payloads, and pass only rendered text through the guarded send services.
+- Keep accepted outgoing messages optimistic until the normal background poll
+  reconciles stored history, avoiding a redundant post-send panel refresh that
+  could move the Messages timeline away from the latest message.
+- Attach visual MeshMonitor device triggers from their stable source-device
+  identity so Home Assistant automation startup no longer races integration
+  runtime loading after a restart.
+
 ## 0.18.0-rc.1
 
 - Replace the blocked OpenStreetMap basemap with curated dark gray, light gray,

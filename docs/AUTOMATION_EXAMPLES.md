@@ -102,6 +102,8 @@ approved fields below; it does not expose MeshMonitor's raw API response.
 | `direction` | string | `incoming` or `unknown`; outgoing messages are suppressed. |
 | `rssi`, `snr` | number, optional | Best available matching reception signal values. |
 | `hop_count` | integer, optional | Packet hop count when reported; otherwise the sender node's latest known hop count. |
+| `route_path` | list of strings, optional | Bounded MeshCore route prefixes exactly as stored for that received packet, normalized to uppercase. |
+| `route_hops` | list of objects, optional | MeshCore route entries with `hash` and source-scoped `name`; the name is null when the prefix is unknown or ambiguous. |
 | `via_mqtt` | boolean, optional | Present only when the message record explicitly classifies MQTT transport. |
 | `direct_rf` | boolean, optional | Present only when packet hop data is available; true means zero-hop and not explicitly MQTT. |
 | `sender_role`, `sender_hardware_model` | string, optional | Already-loaded sender metadata. |
@@ -110,7 +112,7 @@ approved fields below; it does not expose MeshMonitor's raw API response.
 | `text` | string, optional | Present only when a matching source's text-in-events option is enabled. |
 
 Treat all fields as potentially sensitive. Node IDs and names, source IDs,
-channel metadata, routing, and timestamps can disclose activity even without
+channel metadata, route prefixes, and timestamps can disclose activity even without
 message text. Do not assume that a timestamp is always an ISO string or always
 an epoch number.
 

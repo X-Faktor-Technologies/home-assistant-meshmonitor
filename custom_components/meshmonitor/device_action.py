@@ -11,6 +11,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import selector
+from homeassistant.helpers.template import Template
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_ENABLE_NODE_MANAGEMENT, DOMAIN, SOURCE_TYPE_MESHCORE
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 ATTR_DESTINATION_NODE_ID = "destination_node_id"
 ATTR_CHANNEL = "channel"
 ATTR_TEXT = "text"
+MAX_TEMPLATE_SOURCE_LENGTH = 4096
 
 ACTION_SEND_DIRECT_TO_KNOWN_NODE = "send_direct_message_to_known_node"
 ACTION_SEND_TO_KNOWN_CHANNEL = "send_channel_message_to_known_channel"
@@ -54,14 +56,20 @@ ACTION_SCHEMA = vol.Any(
         {
             vol.Required(CONF_TYPE): vol.In({ACTION_SEND_DIRECT_TO_KNOWN_NODE}),
             vol.Required(ATTR_DESTINATION_NODE_ID): cv.string,
-            vol.Required(ATTR_TEXT): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Required(ATTR_TEXT): vol.All(
+                str,
+                vol.Length(min=1, max=MAX_TEMPLATE_SOURCE_LENGTH),
+            ),
         }
     ),
     cv.DEVICE_ACTION_BASE_SCHEMA.extend(
         {
             vol.Required(CONF_TYPE): vol.In({ACTION_SEND_TO_KNOWN_CHANNEL}),
             vol.Required(ATTR_CHANNEL): vol.All(vol.Coerce(int), vol.Range(min=0, max=255)),
-            vol.Required(ATTR_TEXT): vol.All(str, vol.Length(min=1, max=200)),
+            vol.Required(ATTR_TEXT): vol.All(
+                str,
+                vol.Length(min=1, max=MAX_TEMPLATE_SOURCE_LENGTH),
+            ),
         }
     ),
     cv.DEVICE_ACTION_BASE_SCHEMA.extend(
@@ -236,13 +244,17 @@ async def async_call_action_from_config(
         from .actions import ATTR_CHANNEL as SERVICE_ATTR_CHANNEL
         from .actions import ATTR_SOURCE_DEVICE_ID, SERVICE_SEND_CHANNEL_MESSAGE
 
+        text = Template(config[ATTR_TEXT], hass).async_render(
+            variables,
+            parse_result=False,
+        )
         await hass.services.async_call(
             DOMAIN,
             SERVICE_SEND_CHANNEL_MESSAGE,
             {
                 ATTR_SOURCE_DEVICE_ID: config[CONF_DEVICE_ID],
                 SERVICE_ATTR_CHANNEL: channel,
-                ATTR_TEXT: config[ATTR_TEXT],
+                ATTR_TEXT: text,
             },
             blocking=True,
             context=context,
@@ -277,13 +289,17 @@ async def async_call_action_from_config(
         return
     from .actions import ATTR_RECIPIENT, ATTR_SOURCE_DEVICE_ID, SERVICE_SEND_DIRECT_MESSAGE
 
+    text = Template(config[ATTR_TEXT], hass).async_render(
+        variables,
+        parse_result=False,
+    )
     await hass.services.async_call(
         DOMAIN,
         SERVICE_SEND_DIRECT_MESSAGE,
         {
             ATTR_SOURCE_DEVICE_ID: config[CONF_DEVICE_ID],
             ATTR_RECIPIENT: destination,
-            ATTR_TEXT: config[ATTR_TEXT],
+            ATTR_TEXT: text,
         },
         blocking=True,
         context=context,

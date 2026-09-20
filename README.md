@@ -10,7 +10,7 @@ server administration. This integration is meant to make day-to-day monitoring
 easy.
 
 - **Latest stable:** `v0.17.1`
-- **Current pre-release:** `v0.18.0-rc.1`
+- **Current pre-release:** `v0.18.0-rc.2`
 
 Back up Home Assistant before installing or upgrading a custom integration.
 
@@ -258,10 +258,10 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-Version `v0.18.0-rc.1` is the current pre-release. It adds curated dark, light,
-streets, topographic, satellite, and tile-free map styles and declares tested
-compatibility with MeshMonitor 4.16.1. Version `v0.17.1` remains the latest
-stable release. See the
+Version `v0.18.0-rc.2` is the current pre-release. It adds route-aware received
+message events, reliable visual message triggers/actions, and stable optimistic
+Messages sends while retaining RC1's curated map styles and tested MeshMonitor
+4.16.1 compatibility. Version `v0.17.1` remains the latest stable release. See the
 [latest release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/latest)
 and [release process](docs/RELEASE_PROCESS.md) for details.
 

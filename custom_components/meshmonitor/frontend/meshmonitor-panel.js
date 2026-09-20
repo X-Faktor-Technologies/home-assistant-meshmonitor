@@ -38,7 +38,7 @@ import {
   persistShowHome,
   readMapStyle,
   readShowHome,
-} from "./map-view.js?v=20260902-0003";
+} from "./map-view.js?v=20260920-0001";
 import {
   reticulumCardPresentation,
   sourceCardPresentation,
@@ -3014,12 +3014,9 @@ class MeshMonitorPanel extends HTMLElement {
       if (result.accepted) {
         pending.state = "accepted";
         pending.deliveryState = result.delivery_state || "accepted";
-        this._render();
-        try {
-          await this._load();
-        } catch (_error) {
-          // The normal polling cycle will reconcile stored history later.
-        }
+        // Keep the optimistic card in place. The normal background poll will
+        // reconcile stored history without replacing the timeline twice in
+        // one send lifecycle and losing its restored scroll position.
       } else {
         pending.state = "failed";
         pending.error = "MeshMonitor did not accept this message. No retry was made.";
@@ -3049,7 +3046,7 @@ class MeshMonitorPanel extends HTMLElement {
   }
 }
 
-if (!customElements.get("meshmonitor-panel-20260902-0003")) {
-  customElements.define("meshmonitor-panel-20260902-0003", MeshMonitorPanel);
+if (!customElements.get("meshmonitor-panel-20260920-0001")) {
+  customElements.define("meshmonitor-panel-20260920-0001", MeshMonitorPanel);
 }
 import "./vendor/leaflet/leaflet.js";
