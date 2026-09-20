@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.18.0-rc.2
+
 - Expose bounded, validated MeshCore route prefixes and source-scoped friendly
   hop names in received-message events so Home Assistant automations can
   provide truthful path acknowledgements without exposing the raw MeshMonitor
