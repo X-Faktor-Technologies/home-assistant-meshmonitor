@@ -94,6 +94,7 @@ Home Assistant integration rather than installed as a Python distribution.
   client support, tests, documentation, and real Home Assistant validation.
 
 Documentation-only corrections do not require a ceremonial patch release.
-The 0.17.0 release line contains the reviewed lifecycle, Messages, and Home
-Assistant 2026.9 compatibility work; subsequent changes remain one bounded
-slice at a time.
+The 0.18.0 release line contains the reviewed lifecycle, Messages, Home
+Assistant 2026.9 compatibility, route-aware MeshCore events, reliable visual
+message actions and triggers, and stable optimistic-send work; subsequent
+changes remain one bounded slice at a time.

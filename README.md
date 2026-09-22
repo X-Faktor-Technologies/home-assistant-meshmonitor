@@ -9,8 +9,7 @@ MeshMonitor still handles radio setup, channels, credentials, firmware, and
 server administration. This integration is meant to make day-to-day monitoring
 easy.
 
-- **Latest stable:** `v0.17.1`
-- **Current pre-release:** `v0.18.0-rc.2`
+- **Latest stable:** `v0.18.0`
 
 Back up Home Assistant before installing or upgrading a custom integration.
 
@@ -258,11 +257,10 @@ and message problems, use the [troubleshooting guide](docs/TROUBLESHOOTING.md).
 
 ## Project status and documentation
 
-Version `v0.18.0-rc.2` is the current pre-release. It adds route-aware received
-message events, reliable visual message triggers/actions, and stable optimistic
-Messages sends while retaining RC1's curated map styles and tested MeshMonitor
-4.16.1 compatibility. Version `v0.17.1` remains the latest stable release. See the
-[latest release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/latest)
+Version `v0.18.0` is the latest stable release. It includes route-aware received
+message events, reliable visual message triggers and actions, stable optimistic
+Messages sends, curated map styles, and tested MeshMonitor 4.16.1 compatibility.
+See the [latest release](https://github.com/X-Faktor-Technologies/home-assistant-meshmonitor/releases/latest)
 and [release process](docs/RELEASE_PROCESS.md) for details.
 
 Version `v0.16.0` remains available as the first stable public release in the

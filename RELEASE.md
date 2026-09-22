@@ -11,7 +11,11 @@ does not publish anything by itself.
   `CHANGELOG.md`, leaving an empty `Unreleased` section above it.
 - [ ] Set the same version in `custom_components/meshmonitor/manifest.json` and
   `pyproject.toml`.
-- [ ] Review user documentation, compatibility requirements, and release notes.
+- [ ] Perform a human content audit of `README.md`, the user guide,
+  troubleshooting, automation examples, API coverage, and the privacy model.
+  Confirm the advertised stable/prerelease versions, supported Home Assistant
+  and MeshMonitor versions, configuration, permissions, features, limitations,
+  screenshots, and release notes match the candidate.
 - [ ] Confirm fixtures and screenshots are synthetic or irreversibly sanitized.
 - [ ] Run every command in the local validation section of
   [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
@@ -32,6 +36,10 @@ does not publish anything by itself.
 - [ ] Review the generated draft release; the workflow must not publish it.
 - [ ] Confirm the draft contains `meshmonitor.zip` and `SHA256SUMS`.
 - [ ] Verify the archive checksum and GitHub artifact provenance attestation.
+- [ ] Inspect every ZIP entry against `release-archive-files.txt`. Confirm there
+  are no Markdown files, tests, caches, logs, patches, repository metadata,
+  development tools, or agent/internal artifacts; only the allowlisted runtime
+  files and required vendored licenses may ship.
 - [ ] Obtain separate maintainer approval before publishing the reviewed draft.
 
 ## Verify
