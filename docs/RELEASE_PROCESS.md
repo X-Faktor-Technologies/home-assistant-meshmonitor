@@ -14,8 +14,11 @@ verification separate and repeatable.
 4. Set the same version in `custom_components/meshmonitor/manifest.json` and
    `pyproject.toml`. Do not add a release date or tag until the candidate is
    ready.
-5. Update concise user documentation for changed configuration, permissions,
-   entities, actions, compatibility, or limitations.
+5. Perform a human content audit of `README.md`, `USER_GUIDE.md`,
+   `TROUBLESHOOTING.md`, `AUTOMATION_EXAMPLES.md`, `API_COVERAGE.md`, and
+   `PRIVACY_THREAT_MODEL.md`. Confirm stable/prerelease labels, supported
+   versions, configuration, permissions, features, limitations, screenshots,
+   and release notes match the candidate; update every affected page.
 6. Review all new fixtures, logs, images, and examples. They must contain only
    synthetic or irreversibly sanitized data.
 
@@ -29,6 +32,11 @@ Run the complete local sequence in [`DEVELOPMENT.md`](DEVELOPMENT.md), including
 tests, type checking, frontend checks, Markdown lint, relative links, metadata,
 screenshot integrity, and repository hygiene. Review `git status --short`,
 `git diff --check`, and the complete candidate diff.
+
+Build the candidate archive locally and inspect every ZIP entry against
+`release-archive-files.txt`. Reject Markdown, tests, caches, logs, patches,
+repository metadata, development tools, and agent/internal artifacts. Only the
+allowlisted runtime files and required vendored licenses may ship.
 
 Open or update the release pull request and require the public validation
 workflow at the exact candidate commit. That workflow also runs Hassfest and
