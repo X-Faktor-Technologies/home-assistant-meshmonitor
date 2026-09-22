@@ -1,0 +1,154 @@
+name: Publish verified release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact draft release tag (for example, v0.18.0)
+        required: true
+        type: string
+      expected_commit:
+        description: Full source commit SHA recorded on the verified draft
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      attestations: read
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.expected_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Rebuild and validate the reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_COMMIT}"
+          test "${#EXPECTED_COMMIT}" -eq 40
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor "${EXPECTED_COMMIT}" refs/remotes/origin/main
+          test -z "$(git ls-remote --tags origin "refs/tags/${RELEASE_TAG}")"
+          python scripts/repository_checks.py metadata --tag "${RELEASE_TAG}"
+          python scripts/repository_checks.py build
+          sha256sum -c SHA256SUMS
+
+      - name: Locate and validate the draft
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > "${RUNNER_TEMP}/releases.json"
+          python - "${RUNNER_TEMP}/releases.json" "${GITHUB_OUTPUT}" <<'PY'
+          import json
+          import os
+          import sys
+
+          releases = json.load(open(sys.argv[1], encoding="utf-8"))
+          tag = os.environ["RELEASE_TAG"]
+          commit = os.environ["EXPECTED_COMMIT"]
+          matches = [release for release in releases if release["tag_name"] == tag]
+          if len(matches) != 1:
+              raise SystemExit(f"Expected one release for {tag}, found {len(matches)}")
+          release = matches[0]
+          if not release["draft"] or release["prerelease"] != ("-" in tag):
+              raise SystemExit("Draft or prerelease state does not match the tag")
+          if release["target_commitish"] != commit:
+              raise SystemExit("Draft target does not match the reviewed commit")
+          if not release.get("body") or "## Release verification" not in release["body"]:
+              raise SystemExit("Release notes have not passed the content audit")
+          assets = {asset["name"]: asset for asset in release["assets"]}
+          if set(assets) != {"meshmonitor.zip", "SHA256SUMS"}:
+              raise SystemExit(f"Unexpected assets: {sorted(assets)}")
+          with open(sys.argv[2], "a", encoding="utf-8") as output:
+              print(f"id={release['id']}", file=output)
+              print(f"zip_id={assets['meshmonitor.zip']['id']}", file=output)
+              print(f"sums_id={assets['SHA256SUMS']['id']}", file=output)
+          PY
+
+      - name: Verify draft assets and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api -H 'Accept: application/octet-stream' \
+            "repos/${GITHUB_REPOSITORY}/releases/assets/${{ steps.release.outputs.zip_id }}" \
+            > "${RUNNER_TEMP}/draft.zip"
+          gh api -H 'Accept: application/octet-stream' \
+            "repos/${GITHUB_REPOSITORY}/releases/assets/${{ steps.release.outputs.sums_id }}" \
+            > "${RUNNER_TEMP}/draft.SHA256SUMS"
+          cmp meshmonitor.zip "${RUNNER_TEMP}/draft.zip"
+          cmp SHA256SUMS "${RUNNER_TEMP}/draft.SHA256SUMS"
+          archive_sha="$(sha256sum meshmonitor.zip | awk '{print $1}')"
+          gh api "repos/${GITHUB_REPOSITORY}/attestations/sha256:${archive_sha}" \
+            > "${RUNNER_TEMP}/attestations.json"
+          python - "${RUNNER_TEMP}/attestations.json" "${archive_sha}" <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          digest = sys.argv[2]
+          commit = os.environ["EXPECTED_COMMIT"]
+          for item in data.get("attestations", []):
+              payload = json.loads(base64.b64decode(
+                  item["bundle"]["dsseEnvelope"]["payload"]
+              ))
+              subjects = payload.get("subject", [])
+              dependencies = payload.get("predicate", {}).get(
+                  "buildDefinition", {}
+              ).get("resolvedDependencies", [])
+              if (
+                  {"name": "meshmonitor.zip", "digest": {"sha256": digest}}
+                  in subjects
+                  and any(
+                      entry.get("digest", {}).get("gitCommit") == commit
+                      for entry in dependencies
+                  )
+              ):
+                  break
+          else:
+              raise SystemExit("No provenance matches the archive and commit")
+          PY
+
+      - name: Publish and verify the immutable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_TAG}" == *-* ]]; then
+            prerelease=true
+            make_latest=false
+          else
+            prerelease=false
+            make_latest=true
+          fi
+          gh api --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${{ steps.release.outputs.id }}" \
+            -f tag_name="${RELEASE_TAG}" \
+            -f target_commitish="${EXPECTED_COMMIT}" \
+            -F draft=false \
+            -F prerelease="${prerelease}" \
+            -f make_latest="${make_latest}" > "${RUNNER_TEMP}/published.json"
+          tag_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha)"
+          test "${tag_sha}" = "${EXPECTED_COMMIT}"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${{ steps.release.outputs.id }}" \
+            --jq 'select(.draft == false and .tag_name == env.RELEASE_TAG) | .html_url'

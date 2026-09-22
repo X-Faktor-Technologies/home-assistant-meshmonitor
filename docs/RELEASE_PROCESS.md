@@ -67,14 +67,23 @@ workflow refuses non-`main` refs, stale commits, and existing tags. It then:
 
 Before enabling this workflow, install a ruleset for `refs/tags/v*` that
 restricts creation to the environment-approved release automation identity and
-blocks updates and deletion. This is mandatory because historical commits may
-contain older tag-triggered workflows; current workflow code cannot retroactively
-change them.
+blocks updates and deletion. Grant the GitHub Actions integration a creation
+bypass only; do not grant a user, team, repository role, or deploy key a broad
+bypass. This is mandatory because historical commits may contain older
+tag-triggered workflows; current workflow code cannot retroactively change
+them.
 
-Review the draft, checksum, provenance, and generated notes. Publishing the
-draft is a separate maintainer action and approval gate. Do not move a
-published tag or replace a published archive. Correct a release with a new
-version so users can verify its history and provenance.
+Review the draft, checksum, provenance, generated notes, and every archive
+entry. Replace generic generated notes with the reviewed user-facing summary
+when necessary. Then dispatch **Publish verified release** from `main` with the
+exact tag and full source commit recorded on the draft. Its protected
+environment independently rebuilds the reviewed commit and verifies release
+metadata, draft state, assets, checksum, and provenance before the GitHub
+Actions identity creates the immutable tag and publishes the draft.
+
+Do not publish a draft directly with a maintainer token, move a published tag,
+or replace a published archive. Correct a release with a new version so users
+can verify its history and provenance.
 
 ## 4. Verify the release
 
