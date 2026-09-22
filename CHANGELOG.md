@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.18.0
+
+This stable release promotes the `0.18.0` release-candidate line after full
+automated validation, deterministic archive and provenance verification,
+Home Assistant configuration and restart/reconnect testing, real multi-hop
+MeshCore path acknowledgements, and mobile Messages acceptance. It introduces
+no changes beyond the reviewed release candidates.
+
 ## 0.18.0-rc.2
 
 - Expose bounded, validated MeshCore route prefixes and source-scoped friendly
